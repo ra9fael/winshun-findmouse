@@ -1,0 +1,145 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LingCore/WinShun-plugins/main/schema/plugin.schema.json",
+  "manifest": 1,
+  "id": "ra9fael.findmouse",
+  "name": {"zh": "晃动找鼠标", "en": "Find My Mouse"},
+  "version": "0.4.1",
+  "description": {
+    "zh": "快速左右晃动鼠标时在指针位置显示一圈涟漪动效，帮助找回光标；也提供 mouse 关键字手动触发、开关检测和诊断",
+    "en": "Show a ripple at the pointer when the mouse is shaken quickly, so a lost cursor is easy to spot; the mouse keyword triggers it manually and toggles detection"
+  },
+  "author": "ra9fael",
+  "license": "MIT",
+  "runtime": {
+    "mode": "resident",
+    "program": "findmouse.exe",
+    "sandbox": "normal",
+    "start": "eager",
+    "timeoutMs": 1500,
+    "memoryMB": 64,
+    "idleExitSec": 0,
+    "encoding": "utf-8"
+  },
+  "permissions": ["ui"],
+  "commands": [
+    {
+      "id": "mouse",
+      "keyword": ["mouse", "找鼠标"],
+      "title": {"zh": "找鼠标", "en": "Find my mouse"},
+      "description": {
+        "zh": "手动显示定位涟漪、开关晃动检测、复制诊断信息；全部只读，按了键才有副作用",
+        "en": "Show the ripple manually, toggle shake detection, copy diagnostics; read-only until a key is pressed"
+      },
+      "icon": "glyph:U+E7C9",
+      "hint": {
+        "zh": "留空列出全部；Enter 显示涟漪，Ctrl+Enter 开关晃动检测，Shift+Enter 复制诊断",
+        "en": "empty lists all; Enter shows the ripple, Ctrl+Enter toggles detection, Shift+Enter copies diagnostics"
+      },
+      "actions": [
+        {"id": "showNow", "title": {"zh": "显示定位动画", "en": "Show ripple"}, "key": "Enter"},
+        {"id": "toggleShake", "title": {"zh": "开启 / 关闭晃动检测", "en": "Toggle shake detection"}, "key": "Ctrl+Enter"},
+        {"id": "copyDiagnostics", "title": {"zh": "复制诊断信息", "en": "Copy diagnostics"}, "key": "Shift+Enter"}
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "shakeEnabled",
+      "type": "bool",
+      "title": {"zh": "启用晃动检测", "en": "Enable shake detection"},
+      "hint": {"zh": "Ctrl+Enter 切换会立即生效并保存到这里", "en": "the Ctrl+Enter toggle takes effect at once and is saved here"},
+      "default": true
+    },
+    {
+      "key": "shakeReversals",
+      "type": "number",
+      "title": {"zh": "换向次数（次）", "en": "Reversals needed (count)"},
+      "hint": {"zh": "2–8 次，默认 4 次；越大越难误触发", "en": "2–8, default 4; higher means fewer false triggers"},
+      "default": 4
+    },
+    {
+      "key": "shakeWindowMs",
+      "type": "number",
+      "title": {"zh": "手势时间窗（毫秒）", "en": "Gesture window (ms)"},
+      "hint": {"zh": "80–2000 毫秒，默认 300 毫秒；最近的换向必须落在该时间内", "en": "80–2000 ms, default 300 ms; the newest reversals must fit in it"},
+      "default": 300
+    },
+    {
+      "key": "shakeStrokePx",
+      "type": "number",
+      "title": {"zh": "晃动距离（像素）", "en": "Stroke distance (px)"},
+      "hint": {"zh": "2–200 像素，默认 8 像素；单次行程小于该幅度的移动被忽略", "en": "2–200 px, default 8 px; strokes shorter than this are ignored"},
+      "default": 8
+    },
+    {
+      "key": "shakeMinSpeed",
+      "type": "number",
+      "title": {"zh": "速度门槛（像素/秒）", "en": "Speed gate (px/s)"},
+      "hint": {"zh": "0–20000 像素/秒，默认 500；行程峰值速度低于该值视为拖动而非晃动，0 关闭门槛", "en": "0–20000 px/s, default 500; strokes whose peak speed is below this are treated as drags, 0 disables the gate"},
+      "default": 500
+    },
+    {
+      "key": "shakeCooldownMs",
+      "type": "number",
+      "title": {"zh": "触发后冷却（毫秒）", "en": "Cooldown after trigger (ms)"},
+      "hint": {"zh": "0–10000 毫秒，默认 1500 毫秒；冷却期内不重复触发", "en": "0–10000 ms, default 1500 ms; no re-trigger while it lasts"},
+      "default": 1500
+    },
+    {
+      "key": "rippleEffect",
+      "type": "choice",
+      "title": {"zh": "动效样式", "en": "Effect style"},
+      "hint": {"zh": "涟漪/水波/光晕/雷达为内置样式；自定义使用下方 JSON", "en": "ring/waves/halo/radar are built-in; custom uses the JSON below"},
+      "default": "ring",
+      "options": [
+        {"value": "ring", "title": {"zh": "涟漪（默认）", "en": "Ring (default)"}},
+        {"value": "waves", "title": {"zh": "水波", "en": "Waves"}},
+        {"value": "halo", "title": {"zh": "光晕", "en": "Halo"}},
+        {"value": "radar", "title": {"zh": "雷达", "en": "Radar"}},
+        {"value": "custom", "title": {"zh": "自定义（JSON）", "en": "Custom (JSON)"}}
+      ]
+    },
+    {
+      "key": "followTimeoutMs",
+      "type": "number",
+      "title": {"zh": "自动消失时间（毫秒）", "en": "Auto-dismiss after (ms)"},
+      "hint": {"zh": "0–60000 毫秒，默认 0 = 不自动消失，一直跟随直到按下左/右键", "en": "0–60000 ms, default 0 = never auto-dismiss; the beacon follows until a left/right click"},
+      "default": 0
+    },
+    {
+      "key": "fadeOutMs",
+      "type": "number",
+      "title": {"zh": "淡出时长（毫秒）", "en": "Fade-out duration (ms)"},
+      "hint": {"zh": "0–3000 毫秒，默认 400 毫秒；按下左/右键或自动消失后信标逐渐淡出，0 = 立即消失", "en": "0–3000 ms, default 400 ms; after a left/right click or the auto-dismiss the beacon fades out gradually; 0 = vanish at once"},
+      "default": 400
+    },
+    {
+      "key": "rippleMs",
+      "type": "number",
+      "title": {"zh": "动画时长（毫秒）", "en": "Animation duration (ms)"},
+      "hint": {"zh": "200–3000 毫秒，默认 700 毫秒；一个脉冲周期的长度，自定义样式未写 loopMs 时也用它", "en": "200–3000 ms, default 700 ms; one pulse cycle; also used by custom styles without loopMs"},
+      "default": 700
+    },
+    {
+      "key": "rippleSize",
+      "type": "number",
+      "title": {"zh": "涟漪半径（像素）", "en": "Ripple radius (px)"},
+      "hint": {"zh": "24–256 像素，默认 64（96 dpi 基准，随系统缩放）", "en": "24–256 px, default 64 (96 dpi reference, scales with display scaling)"},
+      "default": 64
+    },
+    {
+      "key": "rippleColor",
+      "type": "text",
+      "title": {"zh": "涟漪颜色", "en": "Ripple color"},
+      "hint": {"zh": "#RRGGBB 或 #RGB，默认 #2AA8FF；JSON 里的 \"accent\" 也指向它", "en": "#RRGGBB or #RGB, default #2AA8FF; the JSON's \"accent\" resolves to it"},
+      "default": "#2AA8FF"
+    },
+    {
+      "key": "customStyle",
+      "type": "text",
+      "title": {"zh": "自定义样式（JSON）", "en": "Custom style (JSON)"},
+      "hint": {"zh": "动效样式选“自定义”时生效；声明式 JSON，语法和示例见 README；解析失败自动回退上一有效样式", "en": "used when the effect style is custom; declarative JSON, syntax and examples in the README; a parse failure keeps the previous style"},
+      "default": ""
+    }
+  ]
+}
