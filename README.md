@@ -31,8 +31,31 @@
 
 **卸载：** 在 **设置 → 插件 → 已安装** 里移除。
 
-本插件是原生 exe，不会出现在 Win顺 应用内的插件库里（社区索引只收脚本插件）。
-本仓库的 Release 是唯一的分发渠道。
+本插件是原生 exe 包。Win顺 0.22.0 起插件库按 **未审核的原生插件**
+（`unreviewed-native`）收录社区 exe 包，所以它需要 Win顺 0.22.0 或更新
+（清单里的 `minWinShun` 声明了这一点），安装和每次更新都会要求确认。
+本仓库的 Release 始终是源码与发布包的原始出处（见
+[发布与来源](#发布与来源)）。
+
+## 发布与来源
+
+`v0.4.2` 是发布包对应的源码标签。发布包由本仓库在该标签上构建：MSVC
+（Visual Studio 2022，与 CI/release 相同）、静态链接 CRT，`findmouse.exe`
+不依赖任何运行库：
+
+```powershell
+cmake -S . -B build -A x64
+cmake --build build --config Release
+python tools/package.py
+```
+
+`ra9fael.findmouse-<version>.wsplugin` 是确定性 zip（文件名排序、固定时间戳），
+内容是 git 跟踪的全部文件（`plugin.json`、`findmouse.exe`、源码、测试与本
+README），旁边附 `.sha256` 和 `release-notes.md`（取自 CHANGELOG 的对应版本节）。
+
+这是社区原生插件（包内有 exe）：插件库以 `unreviewed-native` 收录，安装和
+每次更新都要用户确认；公开源码、构建命令和 SHA-256 只是来源凭证，
+不等于代码安全审核。
 
 ## 从源码构建
 
@@ -153,6 +176,8 @@ Shift+Enter 的顺序才是实际绑定）。所有功能都能从键盘到达�
 
 ## 运行时依赖
 
+- Win顺 0.22.0 或更新（`minWinShun`）：这是社区原生包（exe），插件库按
+  `unreviewed-native` 收录，旧版客户端没有原生包的安装风险确认。
 - Windows 10 1809+ / Windows 11，x64（构建时拒绝 32 位）。
 - 以静态链接的 `findmouse.exe` 发布；不需要运行库、不需要 Python、不联网。
 - 常驻插件（`mode: resident`）、`start: eager`、`idleExitSec: 0`——启动器关闭时它也
