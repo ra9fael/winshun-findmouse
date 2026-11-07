@@ -38,9 +38,35 @@ asks before replacing the old version, and keeps the plugin's data folder.
 **Uninstall:** remove it from **Settings → Plugins → Installed**
 (**设置 → 插件 → 已安装** in the Chinese UI).
 
-This plugin is a native exe, so it is not listed in Win顺's in-app plugin
-library (the community index accepts script plugins only). The releases of this
-repository are the only distribution channel.
+This plugin is a native exe package. Since Win顺 0.22.0 the plugin library
+accepts community exe packages under the **unreviewed-native** category, so it
+requires Win顺 0.22.0 or newer (declared as `minWinShun` in the manifest),
+and installing it, and every update, ask for confirmation. The releases of
+this repository remain the origin of the source and the package (see
+[Release and provenance](#release-and-provenance)).
+
+## Release and provenance
+
+`v0.4.2` is the source tag for the released package. It is built from this
+repository at that tag: MSVC (Visual Studio 2022, same as CI and the release
+workflow) with a statically linked CRT — `findmouse.exe` needs no runtime
+DLLs:
+
+```powershell
+cmake -S . -B build -A x64
+cmake --build build --config Release
+python tools/package.py
+```
+
+`ra9fael.findmouse-<version>.wsplugin` is a deterministic zip (sorted names,
+fixed timestamps) containing every git-tracked file (`plugin.json`,
+`findmouse.exe`, the sources, the tests and this README), with a `.sha256`
+and a `release-notes.md` (the matching CHANGELOG section) next to it.
+
+This is a community native plugin (the package contains an exe): the plugin
+library lists it as `unreviewed-native`. Installing and every update require
+the user's confirmation; the public source, build command and SHA-256
+document provenance but are not a code review.
 
 ## Build from source
 
@@ -172,6 +198,9 @@ Copy-paste starting points:
 
 ## Runtime dependencies
 
+- Win顺 0.22.0 or newer (`minWinShun`): this is a community native package
+  (`exe`), and the plugin library lists it as `unreviewed-native`; older
+  clients have no install-risk confirmation for native packages.
 - Windows 10 1809+ / Windows 11, x64 (the build refuses 32-bit).
 - Ships as a statically linked `findmouse.exe`; no runtime libraries, no
   Python, no network.

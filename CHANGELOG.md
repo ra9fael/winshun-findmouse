@@ -7,7 +7,23 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-07
+
+### Added
+- `minWinShun: 0.22.0` and `homepage` in the manifest. `minWinShun` is required
+  for a community native (exe) package: the plugin library lists it as
+  `unreviewed-native`, and clients older than 0.22.0 have no install-risk
+  confirmation for native packages, so they must not enable it.
+
 ### Changed
+- The SDK header (`winshun.h`) is refreshed from WinShun 0.22's
+  `src/plugins-sdk/winshun.h` (details support for #202, theme/style
+  appearance, the plugin-host `serve(HANDLE, HANDLE)` variant). No code
+  change was needed; the plugin does not use any of the new methods yet.
+- The plugin library's community index now accepts native exe packages under
+  the "unreviewed-native" category, so the README no longer claims the
+  in-app library is script-only; the GitHub Releases stay the source of
+  truth. No runtime behavior change.
 - `README.md` is now the Chinese (default) documentation; `README.en.md` holds
   the full English text. Both link to each other. The English install steps now
   use Win顺's real English UI labels. No runtime change.
@@ -58,5 +74,6 @@ published; they are listed below for context.
   overlay, and the `mouse` / `找鼠标` keyword (show beacon, toggle detection,
   copy diagnostics).
 
-[Unreleased]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ra9fael/winshun-findmouse/releases/tag/v0.4.1
