@@ -7,6 +7,26 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-11-07
+
+### Fixed
+- The beacon could never be dismissed when Win顺 ran as administrator: the
+  host de-elevates the plugin to medium integrity, and Windows UIPI hides
+  input aimed at elevated windows — with the focus on an elevated window
+  neither the mouse hook nor `GetAsyncKeyState` can see anything, so shakes
+  never triggered and clicks never dismissed. The plugin now probes the host
+  chain's integrity once at startup: when elevated, the query results grow a
+  notice row ("Win顺 提权中…", Enter for details) and the diagnostics report
+  `integrity: high` with the host process name.
+
+### Changed
+- `followTimeoutMs` defaults to 3000 ms (was 0 = never). With click-to-dismiss
+  unavailable on elevated windows, "never auto-dismiss" left the beacon stuck
+  forever; a timeout backstop guarantees it always goes away. Set it back to 0
+  for the old follow-until-click behavior.
+- Diagnostics report the host process and its integrity level
+  (`host process: …, integrity: medium/high/unknown`).
+
 ## [0.4.2] - 2026-11-07
 
 ### Added
@@ -74,6 +94,7 @@ published; they are listed below for context.
   overlay, and the `mouse` / `找鼠标` keyword (show beacon, toggle detection,
   copy diagnostics).
 
-[Unreleased]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ra9fael/winshun-findmouse/releases/tag/v0.4.1

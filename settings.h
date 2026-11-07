@@ -363,7 +363,7 @@ struct Settings {
     Effect effect = Effect::Ring;
     int rippleMs = 700; // 200..3000
     int rippleSize = 64; // ring's outer radius at rest, px at 96 dpi; 24..256
-    int followTimeoutMs = 0; // auto-dismiss; 0 = follow until a mouse button
+    int followTimeoutMs = 3000; // auto-dismiss; 0 = follow until a mouse button
     int fadeOutMs = 400; // decay when the beacon ends; 0..3000, 0 = hide at once
     Rgb accent;
     std::string accentText = "#2AA8FF"; // as given, echoed in diagnostics

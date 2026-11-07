@@ -3,7 +3,7 @@
   "manifest": 1,
   "id": "ra9fael.findmouse",
   "name": {"zh": "晃动找鼠标", "en": "Find My Mouse"},
-  "version": "0.4.2",
+  "version": "0.4.3",
   "minWinShun": "0.22.0",
   "description": {
     "zh": "快速左右晃动鼠标时在指针位置显示一圈涟漪动效，帮助找回光标；也提供 mouse 关键字手动触发、开关检测和诊断",
@@ -105,8 +105,8 @@
       "key": "followTimeoutMs",
       "type": "number",
       "title": {"zh": "自动消失时间（毫秒）", "en": "Auto-dismiss after (ms)"},
-      "hint": {"zh": "0–60000 毫秒，默认 0 = 不自动消失，一直跟随直到按下左/右键", "en": "0–60000 ms, default 0 = never auto-dismiss; the beacon follows until a left/right click"},
-      "default": 0
+      "hint": {"zh": "0–60000 毫秒，默认 3000 毫秒；超时后信标自动淡出，0 = 不自动消失、一直跟随直到按下左/右键", "en": "0–60000 ms, default 3000 ms; the beacon fades out after the timeout; 0 = never auto-dismiss and follow until a left/right click"},
+      "default": 3000
     },
     {
       "key": "fadeOutMs",

@@ -109,7 +109,7 @@ input (remote-control tools, test harnesses) are ignored.
 **The beacon** follows the pointer every frame and ends when you press the
 **left or right mouse button** (polled per frame with `GetAsyncKeyState`; the
 hook is not involved in ending it), or after the `followTimeoutMs` setting
-(**0–60000 ms, default 0 = never auto-dismiss**). It does not vanish on the
+(**0–60000 ms, default 3000 ms = auto-dismiss; 0 = never auto-dismiss**). It does not vanish on the
 spot: it **fades out** over `fadeOutMs` (**0–3000 ms, default 400 ms**;
 quadratic decay of the whole-window opacity, still animating and following the
 pointer; 0 = hide at once). Buttons are not polled during the fade. A new
@@ -137,7 +137,7 @@ setting titles):
 | `shakeWindowMs` | 300 ms | time span the newest reversals must fit in |
 | `shakeCooldownMs` | 1500 ms | quiet time after a trigger |
 | `rippleEffect` | ring | beacon style: ring / waves / halo / radar / custom |
-| `followTimeoutMs` | 0 (never) | 0–60000 ms; 0 = follow until a mouse button |
+| `followTimeoutMs` | 3000 ms | 0–60000 ms; auto-dismiss after the timeout; 0 = follow until a mouse button |
 | `fadeOutMs` | 400 ms | 0–3000 ms; fade-out after a click or the timeout; 0 = instant |
 | `rippleMs` | 700 ms | pulse cycle; also used by custom styles without `loopMs` |
 | `rippleSize` | 64 px | radius at rest (96 dpi reference, scales with display scaling) |
@@ -247,6 +247,15 @@ provided by the host at initialize). It stores the last user toggle:
 
 - Hook install failure (policy or resource): logged via `winshun/log`, the
   result rows say "hook not running", and the diagnostics still work.
+- **When Win顺 runs as administrator, shake detection goes blind on elevated
+  windows**: a hard Windows UIPI boundary, not a bug — the plugin is
+  de-elevated to medium integrity by the host, and while the focus sits on an
+  elevated window neither the low-level mouse hook nor `GetAsyncKeyState` can
+  see the input (no shake trigger, no click-to-dismiss). The plugin checks
+  the host's integrity: when elevated, the result list grows a notice row and
+  the diagnostics say `integrity: high`. Running Win顺 without elevation
+  restores everything; the auto-dismiss timeout (default 3000 ms) guarantees
+  the beacon never sticks under any circumstance.
 - Overlay failure: the hook keeps running; the next trigger retries.
 - Settings errors: every numeric setting is clamped; a bad color keeps the
   default accent. A broken `state.json` is ignored (falls back to defaults).
@@ -276,7 +285,9 @@ MIT, see [LICENSE](LICENSE). Release history: [CHANGELOG.md](CHANGELOG.md).
   to tune the thresholds.
 - Whether the beacon is visible over **exclusive fullscreen** or
   **administrator** windows depends on Windows integrity levels and is not
-  guaranteed (see Permissions).
+  guaranteed (see Permissions); beyond visibility, **input** is under the same
+  UIPI rule — shakes and clicks are invisible while an elevated window has
+  focus (see Failure handling).
 - The beacon's DPI snapshot is taken at the trigger point; moving to a monitor
   with different scaling mid-follow keeps the old size until the next trigger.
 - v0.2 ends the beacon on any left/right click **anywhere** (the window is
