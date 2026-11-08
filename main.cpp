@@ -37,7 +37,7 @@
 namespace {
 
 constexpr const char* kPluginName = "ra9fael.findmouse";
-constexpr const char* kVersion = "0.4.4";
+constexpr const char* kVersion = "0.4.5";
 constexpr int kStateVersion = 1; // state.json format version, not the plugin version
 
 using fm::MouseHook;
