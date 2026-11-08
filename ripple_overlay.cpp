@@ -6,11 +6,12 @@
 //   * ring  — one ring expanding from 35% to full radius and fading out,
 //   * waves — three staggered expanding ripples,
 //   * halo  — a breathing soft glow disc around the pointer,
-//   * radar — a rotating sonar sweep inside a static circle.
+//   * radar — a rotating sonar sweep inside a static circle,
+//   * ping/heart/orbit/custom — validated declarative layers.
 // Every style ends with a constant center dot so the exact pointer spot is
 // never lost. Follow mode ends when the user presses the left or right mouse
-// button (polled with GetAsyncKeyState, no hook involvement) or after a
-// 30 s safety cap.
+// button (polled with GetAsyncKeyState, no hook involvement) or the configured
+// follow timeout, then fades for the configured duration.
 //
 // Visibility on any background (findmouse-plugin-design.md §6): the accent
 // figure, a thin white outline just outside it (dark surfaces), and a soft
@@ -95,14 +96,20 @@ bool RippleOverlay::start()
 {
     if (m_running.load())
         return true;
+    if (m_thread.joinable())
+        m_thread.join();
+    std::promise<bool> ready;
+    auto started = ready.get_future();
     m_running.store(true);
     try {
-        m_thread = std::thread([this] { run(); });
+        m_thread = std::thread(&RippleOverlay::run, this, std::move(ready));
     } catch (...) {
         m_running.store(false);
         return false;
     }
-    return true;
+    // The first updateStyle/request must reach a real message queue. Returning
+    // before the worker creates it silently drops initialize-time presets.
+    return started.get();
 }
 
 void RippleOverlay::stop()
@@ -126,16 +133,14 @@ void RippleOverlay::updateStyle(const Settings& settings, std::shared_ptr<const 
     const DWORD tid = m_threadId.load();
     if (tid == 0)
         return;
-    auto* m = new StyleMsg { settings.rippleMs, settings.rippleSize,
-        settings.followTimeoutMs, settings.fadeOutMs, settings.effect, settings.accent, std::move(customDoc) };
-    ::PostThreadMessageW(tid, WM_APP_STYLE, reinterpret_cast<WPARAM>(m), 0);
+    auto m = std::make_unique<StyleMsg>(StyleMsg { settings.rippleMs, settings.rippleSize,
+        settings.followTimeoutMs, settings.fadeOutMs, settings.effect, settings.accent, std::move(customDoc) });
+    if (::PostThreadMessageW(tid, WM_APP_STYLE, reinterpret_cast<WPARAM>(m.get()), 0))
+        m.release(); // ownership moves to the worker only after a successful post
 }
 
-void RippleOverlay::run()
+void RippleOverlay::run(std::promise<bool> ready)
 {
-    m_threadId.store(::GetCurrentThreadId());
-    m_running.store(true);
-
     static const bool classRegistered = [] {
         WNDCLASSW wc = {};
         wc.lpfnWndProc = &RippleOverlay::procStatic;
@@ -151,6 +156,14 @@ void RippleOverlay::run()
         WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT,
         kClassName, L"", WS_POPUP, 0, 0, 1, 1, nullptr, nullptr,
         ::GetModuleHandleW(nullptr), this);
+
+    if (!m_hwnd) {
+        m_running.store(false);
+        ready.set_value(false);
+        return;
+    }
+    m_threadId.store(::GetCurrentThreadId());
+    ready.set_value(true);
 
     MSG msg;
     while (m_running.load()) {
@@ -174,6 +187,10 @@ void RippleOverlay::run()
         }
     }
 
+    m_threadId.store(0);
+    // Shutdown may leave settings messages queued behind WM_QUIT.
+    while (::PeekMessageW(&msg, nullptr, WM_APP_STYLE, WM_APP_STYLE, PM_REMOVE))
+        delete reinterpret_cast<StyleMsg*>(msg.wParam);
     if (m_hwnd) {
         ::DestroyWindow(m_hwnd);
         m_hwnd = nullptr;
@@ -296,13 +313,13 @@ void RippleOverlay::drawFrame(HWND hwnd)
     }
 
     // One pulse cycle is p in [0, 1); each style maps it to its own motion.
-    // A custom document may carry its own loop length.
+    // A preset or custom document may carry its own loop length.
     const double s = m_scalePct / 100.0;
     int cycle = m_rippleMs;
-    if (m_effect == Effect::Custom && m_style && m_style->loopMs > 0)
+    if (usesStyleDoc(m_effect) && m_style && m_style->loopMs > 0)
         cycle = m_style->loopMs;
-    const double p = static_cast<double>((now - m_pulseStart) % (cycle > 0 ? cycle : 1))
-        / (cycle > 0 ? cycle : 1);
+    const double cycles = static_cast<double>(now - m_pulseStart) / (cycle > 0 ? cycle : 1);
+    const double p = std::fmod(cycles, 1.0);
 
     if (!ensureDib())
         return;
@@ -317,7 +334,10 @@ void RippleOverlay::drawFrame(HWND hwnd)
         renderRadar(s, p);
         break;
     case Effect::Custom:
-        renderCustom(s, p);
+    case Effect::Ping:
+    case Effect::Heart:
+    case Effect::Orbit:
+        renderCustom(s, cycles); // DSL presets share the generic renderer
         break;
     case Effect::Ring:
         renderRing(s, p);
@@ -589,13 +609,13 @@ void RippleOverlay::renderRadar(double s, double p)
     }
 }
 
-void RippleOverlay::renderCustom(double s, double p)
+void RippleOverlay::renderCustom(double s, double cycles)
 {
-    // Generic renderer for the user's StyleDoc. Strongest alpha wins across
-    // layers; a missing/failed document degrades to the ring, never to a
-    // blank overlay.
+    // Generic renderer for DSL presets and the user's StyleDoc. Strongest
+    // alpha wins across layers; a missing/failed document degrades to the
+    // ring, never to a blank overlay.
     if (!m_style || m_style->layers.empty()) {
-        renderRing(s, p);
+        renderRing(s, std::fmod(cycles, 1.0));
         return;
     }
     const BandColor accentC { m_accent.b, m_accent.g, m_accent.r };
@@ -613,7 +633,7 @@ void RippleOverlay::renderCustom(double s, double p)
             double a = 0.0;
             BandColor col = accentC;
             for (const StyleLayer& l : m_style->layers) {
-                const double pe = std::fmod(p + l.phase, 1.0);
+                const double pe = std::fmod(cycles + l.phase, 1.0);
                 double cand = 0.0;
                 switch (l.shape) {
                 case LayerShape::Ring: {
@@ -640,11 +660,9 @@ void RippleOverlay::renderCustom(double s, double p)
                             * R;
                     if (d > r || r <= 0.0)
                         break;
-                    const double theta = twoPi * l.speed * pe;
+                    const double theta = sweepAngle(cycles, l.phase, l.speed);
                     const double ang = std::atan2(dy, dx); // screen y is down:
-                    double rel = std::fmod(theta - ang, twoPi); // this sweeps CW
-                    if (rel < 0.0)
-                        rel += twoPi;
+                    const double rel = sweepTrailAngle(theta, ang, l.speed);
                     const double trail = twoPi * l.trailDeg / 360.0;
                     const double glow = smooth(1.0 - rel / trail);
                     cand = evalAlpha(l.alpha, pe) * glow * glow

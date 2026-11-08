@@ -100,11 +100,13 @@ is reachable from the keyboard; no hidden keywords.
 
 ## The gesture and the beacon
 
-**Detection** tracks **horizontal direction reversals** of the pointer with an
-8 px hysteresis. A gesture is 4 reversals within 300 ms, each stroke reaching a
-peak speed of at least 500 px/s (defaults); after a trigger the detector is
-quiet for 1.5 s. Vertical wiggling, drags (any button held), and injected
-input (remote-control tools, test harnesses) are ignored.
+**Detection** tracks **horizontal direction reversals** of the pointer, each
+retreat from the extreme at least 80 px. A gesture is 6 reversals within
+400 ms, every stroke reaching a peak speed of at least 1000 px/s (defaults);
+after a trigger the detector is quiet for 1.5 s. These defaults pass synthetic
+trajectory tests; physical gesture feel and false-positive rates still need
+device-specific measurement and tuning. Vertical wiggling, drags (any button held), and
+injected input (remote-control tools, test harnesses) are ignored.
 
 **The beacon** follows the pointer every frame and ends when you press the
 **left or right mouse button** (polled per frame with `GetAsyncKeyState`; the
@@ -115,28 +117,40 @@ quadratic decay of the whole-window opacity, still animating and following the
 pointer; 0 = hide at once). Buttons are not polled during the fade. A new
 trigger during follow mode just restarts the animation; a trigger during the
 fade revives the beacon at full opacity. Every style keeps a constant center dot so
-the exact pointer spot is never lost. Five switchable styles (the
+the exact pointer spot is never lost. Eight switchable styles (the
 `rippleEffect` setting):
 
 | Style | Look |
 |---|---|
-| `ring` (default) | one ring expanding from 35% to full radius, fading out each cycle |
+| `ring` | one ring expanding from 35% to full radius, fading out each cycle |
 | `waves` | three staggered expanding ripples; one is always alive |
 | `halo` | a breathing soft glow disc around the pointer, low alpha |
 | `radar` | a rotating sonar sweep inside a static circle |
+| `ping` | a fast expanding ring and smaller echo; 1100 ms cycle |
+| `heart` (default) | two phase-shifted heartbeat rings; 1400 ms cycle |
+| `orbit` | two counter-rotating sweep beams; 1600 ms base cycle |
 | `custom` | layers from your own JSON (see "Custom styles" below) |
+
+New installations and users without a saved effect use Heartbeat by default.
+Upgrades preserve a saved selection; choose Heartbeat under Effect style to switch.
+
+The three presets share the custom-layer renderer and can be selected directly,
+without entering JSON. They have fixed cycles and follow the color, radius,
+follow-timeout and fade settings. Comet, Spotlight, Pin and other concepts in
+the design preview are not selectable effects.
+See [Effect screenshots](screenshots.en.md) for captures of the native overlay.
 
 Tunable parameters (all clamped into safe ranges at parse time; units in the
 setting titles):
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `shakeStrokePx` | 8 px | min stroke distance — shorter retreats are hysteresis, not a reversal |
-| `shakeMinSpeed` | 500 px/s | speed gate — strokes whose peak speed is lower are drags, not shakes; 0 disables |
-| `shakeReversals` | 4 | direction changes needed |
-| `shakeWindowMs` | 300 ms | time span the newest reversals must fit in |
+| `shakeStrokePx` | 80 px | min stroke distance — shorter retreats are hysteresis, not a reversal |
+| `shakeMinSpeed` | 1000 px/s | speed gate — strokes whose peak speed is lower are drags, not shakes; 0 disables |
+| `shakeReversals` | 6 | direction changes needed |
+| `shakeWindowMs` | 400 ms | time span the newest reversals must fit in |
 | `shakeCooldownMs` | 1500 ms | quiet time after a trigger |
-| `rippleEffect` | ring | beacon style: ring / waves / halo / radar / custom |
+| `rippleEffect` | heart | beacon style: ring / waves / halo / radar / ping / heart / orbit / custom |
 | `followTimeoutMs` | 3000 ms | 0–60000 ms; auto-dismiss after the timeout; 0 = follow until a mouse button |
 | `fadeOutMs` | 400 ms | 0–3000 ms; fade-out after a click or the timeout; 0 = instant |
 | `rippleMs` | 700 ms | pulse cycle; also used by custom styles without `loopMs` |
@@ -154,8 +168,11 @@ Set `rippleEffect` to `custom` and paste a style document into the
 `customStyle` setting. It is a **declarative** JSON: radii are structured
 curve objects, never user expressions, so there is nothing to inject. Every
 number is clamped and the whole document is rejected on any unknown shape,
-mode or color — a parse failure keeps the previous style and shows
-`custom style: parse error` in the diagnostics (Shift+Enter).
+mode or color. A parse failure keeps the last valid user-authored document and shows
+`custom style: parse error` in the diagnostics (Shift+Enter). Switching through a built-in
+or preset preserves this fallback; clearing the custom JSON clears it. Without a valid
+user document, the renderer falls back to Ring. Diagnostics also report the active
+document's layer count and cycle.
 
 ```json
 {
@@ -256,6 +273,15 @@ provided by the host at initialize). It stores the last user toggle:
   the diagnostics say `integrity: high`. Running Win顺 without elevation
   restores everything; the auto-dismiss timeout (default 3000 ms) guarantees
   the beacon never sticks under any circumstance.
+- **Win顺's own settings window belongs to the elevated main process**: the
+  main search box runs in a de-elevated child process, while the settings
+  window ("Settings - Win顺") stays in the elevated main one. So shaking over
+  the settings window while it is frontmost does not trigger — the common
+  case of the point above; move the pointer onto any non-elevated window (the
+  desktop, Explorer) and the shake works with the settings open too, and
+  minimizing or closing the settings restores everything. What decides
+  visibility is the integrity level of the window **under the mouse**, not
+  whether the settings UI is open.
 - Overlay failure: the hook keeps running; the next trigger retries.
 - Settings errors: every numeric setting is clamped; a bad color keeps the
   default accent. A broken `state.json` is ignored (falls back to defaults).
@@ -268,10 +294,14 @@ provided by the host at initialize). It stores the last user toggle:
 
 - `findmouse_tests` (ctest): pure gesture state machine (fast shake, slow
   movement, sub-stroke jitter, drift, cooldown, config swaps) and settings
-  parsing/clamping/color.
+  parsing/clamping/color, the preset registry, sweep continuity and reverse trails.
+  CTest also checks manifest choices against implemented effects, defaults and bilingual labels.
 - `tests/integration.py`: drives the real exe over its JSON-RPC stdio —
   initialize → query → actions → settingsChanged → shutdown — asserting
-  protocol shape, side-effect rules (queries have none), and state persistence.
+  protocol shape, side-effect rules (queries have none), state persistence, preset startup
+  and live switching, custom fallback across effects, overlay following and fade-out.
+  Tests briefly move and restore the cursor and use isolated temporary state.
+  See [Completing the effect presets](docs/presets-design.en.md) for scope and test levels.
 
 ## License
 

@@ -26,11 +26,11 @@ namespace fm {
 inline constexpr std::size_t kMaxReversals = 8;
 
 struct ShakeConfig {
-    int windowMs = 300;     // reversal span that still counts as one gesture
-    int minReversals = 4;   // direction changes needed (2 = one there-and-back)
-    int strokePx = 8;       // retreat from the extreme that marks a reversal
+    int windowMs = 400;     // reversal span that still counts as one gesture
+    int minReversals = 6;   // direction changes needed (2 = one there-and-back)
+    int strokePx = 80;      // retreat from the extreme that marks a reversal
     int cooldownMs = 1500;  // quiet time after a trigger
-    int minSpeedPxS = 500;  // strokes slower than this (peak speed) are ignored
+    int minSpeedPxS = 1000; // strokes slower than this (peak speed) are ignored
 };
 
 // Clamp a config into safe bounds; out-of-range settings (a bad settings file,
@@ -47,8 +47,8 @@ inline ShakeConfig sanitized(ShakeConfig c)
         c.minReversals = static_cast<int>(kMaxReversals);
     if (c.strokePx < 2)
         c.strokePx = 2;
-    if (c.strokePx > 200)
-        c.strokePx = 200;
+    if (c.strokePx > 600)
+        c.strokePx = 600;
     if (c.cooldownMs < 0)
         c.cooldownMs = 0;
     if (c.cooldownMs > 10000)

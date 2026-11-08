@@ -16,6 +16,7 @@
 // Code and comments are English; user-visible strings are localized with the
 // host locale (Chinese by default, English when the locale starts with "en").
 #include "mouse_hook.h"
+#include "presets.h"
 #include "ripple_overlay.h"
 #include "settings.h"
 #include "shake_logic.h"
@@ -36,7 +37,7 @@
 namespace {
 
 constexpr const char* kPluginName = "ra9fael.findmouse";
-constexpr const char* kVersion = "0.4.3";
+constexpr const char* kVersion = "0.4.4";
 constexpr int kStateVersion = 1; // state.json format version, not the plugin version
 
 using fm::MouseHook;
@@ -140,7 +141,7 @@ public:
     {
         m_host = queryHostIntegrity();
         m_settings = fm::readSettings(settings());
-        reparseCustomStyle();
+        resolveActiveStyle();
         loadState();
         startWorkers();
     }
@@ -148,13 +149,13 @@ public:
     void settingsChanged(const winshun::Json& s) override
     {
         m_settings = fm::readSettings(s);
-        reparseCustomStyle();
+        resolveActiveStyle();
         m_shakeEnabled = m_settings.shakeEnabled; // the settings UI is an explicit user choice too
         if (m_hookStarted)
             m_hook.updateConfig(m_settings.shake);
         m_hook.setEnabled(m_shakeEnabled);
         if (m_overlay.active())
-            m_overlay.updateStyle(m_settings, m_customStyle);
+            m_overlay.updateStyle(m_settings, m_activeStyle);
         saveState();
     }
 
@@ -236,7 +237,7 @@ public:
                 return { winshun::effect::notify(tr("无法获取鼠标位置", "Could not read the pointer position")), effectKeep() };
             if (!m_overlay.active()) {
                 m_overlay.start();
-                m_overlay.updateStyle(m_settings, m_customStyle);
+                m_overlay.updateStyle(m_settings, m_activeStyle);
             }
             m_manualTriggers.fetch_add(1); // counted separately from hook gestures
             m_overlay.request(pt.x, pt.y);
@@ -275,13 +276,31 @@ private:
 
     std::string tr(const char* zh, const char* en) const { return chinese() ? zh : en; }
 
-    // Parse the customStyle setting into a StyleDoc. On failure the previous
-    // good document stays active (and Custom renders its ring fallback if
-    // there never was one); never throws, never blanks the overlay.
-    void reparseCustomStyle()
+    // Resolve the active StyleDoc for the current effect. DSL presets take
+    // their document from the registry (presets.h); Custom parses the
+    // user's customStyle setting. Keep the last valid user document separate
+    // from the selected preset so an invalid custom edit never adopts a
+    // preset, and switching through a built-in never loses the user fallback.
+    void resolveActiveStyle()
     {
+        if (m_settings.effect == fm::Effect::Ping || m_settings.effect == fm::Effect::Heart
+            || m_settings.effect == fm::Effect::Orbit) {
+            const fm::EffectInfo* e = fm::findEffectInfo(fm::effectName(m_settings.effect));
+            m_activeStyle = e ? fm::presetDoc(*e) : nullptr;
+            m_customStatus = m_activeStyle ? std::string("preset (") + e->id + ")"
+                                          : "preset error (ring fallback)";
+            if (!m_activeStyle)
+                log("warn", "ra9fael.findmouse: preset unavailable; using the ring fallback");
+            return;
+        }
+        if (m_settings.effect != fm::Effect::Custom) {
+            m_activeStyle.reset();
+            m_customStatus = "none";
+            return;
+        }
         if (m_settings.customStyleText.empty()) {
             m_customStyle.reset();
+            m_activeStyle.reset();
             m_customStatus = "none";
             return;
         }
@@ -293,14 +312,16 @@ private:
         } else {
             if (!m_customStyle)
                 log("warn", "ra9fael.findmouse: customStyle parse failed; using the ring fallback");
-            m_customStatus = "parse error (previous style kept)";
+            m_customStatus = m_customStyle ? "parse error (previous custom style kept)"
+                                          : "parse error (ring fallback)";
         }
+        m_activeStyle = m_customStyle;
     }
 
     void startWorkers()
     {
         m_overlay.start();
-        m_overlay.updateStyle(m_settings, m_customStyle);
+        m_overlay.updateStyle(m_settings, m_activeStyle);
         m_hookStarted = m_hook.start(m_settings.shake, [this](int x, int y) {
             m_overlay.request(x, y); // enqueue + post: fast enough for the hook
         });
@@ -393,6 +414,11 @@ private:
           << "ms (0 = until a mouse button), fade out: " << m_settings.fadeOutMs
           << "ms (0 = instant)\n";
         o << "custom style: " << m_customStatus << "\n";
+        if (m_activeStyle)
+            o << "style document: " << m_activeStyle->layers.size() << " layers, loop="
+              << (m_activeStyle->loopMs > 0 ? m_activeStyle->loopMs : m_settings.rippleMs) << "ms\n";
+        else
+            o << "style document: none\n";
         o << "locale: " << locale() << ", theme: " << theme() << "\n";
         o << "dataDir: " << dataDir() << "\n";
         return o.str();
@@ -404,6 +430,7 @@ private:
     HostInfo m_host; // parent-chain integrity probe, taken once at startup
     std::atomic<long long> m_manualTriggers { 0 }; // ripples shown via showNow, not the hook
     std::shared_ptr<const fm::StyleDoc> m_customStyle; // parsed customStyle JSON
+    std::shared_ptr<const fm::StyleDoc> m_activeStyle; // selected preset or last valid custom doc
     std::string m_customStatus = "none"; // echoed in diagnostics
     fm::MouseHook m_hook;
     fm::RippleOverlay m_overlay;

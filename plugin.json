@@ -3,7 +3,7 @@
   "manifest": 1,
   "id": "ra9fael.findmouse",
   "name": {"zh": "晃动找鼠标", "en": "Find My Mouse"},
-  "version": "0.4.3",
+  "version": "0.4.4",
   "minWinShun": "0.22.0",
   "description": {
     "zh": "快速左右晃动鼠标时在指针位置显示一圈涟漪动效，帮助找回光标；也提供 mouse 关键字手动触发、开关检测和诊断",
@@ -56,29 +56,29 @@
       "key": "shakeReversals",
       "type": "number",
       "title": {"zh": "换向次数（次）", "en": "Reversals needed (count)"},
-      "hint": {"zh": "2–8 次，默认 4 次；越大越难误触发", "en": "2–8, default 4; higher means fewer false triggers"},
-      "default": 4
+      "hint": {"zh": "2–8 次，默认 6 次；越大越难误触发", "en": "2–8, default 6; higher means fewer false triggers"},
+      "default": 6
     },
     {
       "key": "shakeWindowMs",
       "type": "number",
       "title": {"zh": "手势时间窗（毫秒）", "en": "Gesture window (ms)"},
-      "hint": {"zh": "80–2000 毫秒，默认 300 毫秒；最近的换向必须落在该时间内", "en": "80–2000 ms, default 300 ms; the newest reversals must fit in it"},
-      "default": 300
+      "hint": {"zh": "80–2000 毫秒，默认 400 毫秒；最近的换向必须落在该时间内", "en": "80–2000 ms, default 400 ms; the newest reversals must fit in it"},
+      "default": 400
     },
     {
       "key": "shakeStrokePx",
       "type": "number",
       "title": {"zh": "晃动距离（像素）", "en": "Stroke distance (px)"},
-      "hint": {"zh": "2–200 像素，默认 8 像素；单次行程小于该幅度的移动被忽略", "en": "2–200 px, default 8 px; strokes shorter than this are ignored"},
-      "default": 8
+      "hint": {"zh": "2–600 像素，默认 80 像素；单次行程小于该幅度的移动被忽略", "en": "2–600 px, default 80 px; strokes shorter than this are ignored"},
+      "default": 80
     },
     {
       "key": "shakeMinSpeed",
       "type": "number",
       "title": {"zh": "速度门槛（像素/秒）", "en": "Speed gate (px/s)"},
-      "hint": {"zh": "0–20000 像素/秒，默认 500；行程峰值速度低于该值视为拖动而非晃动，0 关闭门槛", "en": "0–20000 px/s, default 500; strokes whose peak speed is below this are treated as drags, 0 disables the gate"},
-      "default": 500
+      "hint": {"zh": "0–20000 像素/秒，默认 1000；行程峰值速度低于该值被视为拖动而非晃动，0 关闭门槛", "en": "0–20000 px/s, default 1000; strokes whose peak speed is below this are treated as drags, 0 disables the gate"},
+      "default": 1000
     },
     {
       "key": "shakeCooldownMs",
@@ -91,13 +91,16 @@
       "key": "rippleEffect",
       "type": "choice",
       "title": {"zh": "动效样式", "en": "Effect style"},
-      "hint": {"zh": "涟漪/水波/光晕/雷达为内置样式；自定义使用下方 JSON", "en": "ring/waves/halo/radar are built-in; custom uses the JSON below"},
-      "default": "ring",
+      "hint": {"zh": "涟漪/水波/光晕/雷达为内置样式；声呐/心跳/轨道为预设样式；自定义使用下方 JSON", "en": "ring/waves/halo/radar are built-in; ping/heart/orbit are presets; custom uses the JSON below"},
+      "default": "heart",
       "options": [
-        {"value": "ring", "title": {"zh": "涟漪（默认）", "en": "Ring (default)"}},
+        {"value": "ring", "title": {"zh": "涟漪", "en": "Ring"}},
         {"value": "waves", "title": {"zh": "水波", "en": "Waves"}},
         {"value": "halo", "title": {"zh": "光晕", "en": "Halo"}},
         {"value": "radar", "title": {"zh": "雷达", "en": "Radar"}},
+        {"value": "ping", "title": {"zh": "声呐 Ping", "en": "Sonar Ping"}},
+        {"value": "heart", "title": {"zh": "心跳（默认）", "en": "Heartbeat (default)"}},
+        {"value": "orbit", "title": {"zh": "轨道双针", "en": "Orbit Needles"}},
         {"value": "custom", "title": {"zh": "自定义（JSON）", "en": "Custom (JSON)"}}
       ]
     },
@@ -119,7 +122,7 @@
       "key": "rippleMs",
       "type": "number",
       "title": {"zh": "动画时长（毫秒）", "en": "Animation duration (ms)"},
-      "hint": {"zh": "200–3000 毫秒，默认 700 毫秒；一个脉冲周期的长度，自定义样式未写 loopMs 时也用它", "en": "200–3000 ms, default 700 ms; one pulse cycle; also used by custom styles without loopMs"},
+      "hint": {"zh": "200–3000 毫秒，默认 700 毫秒；内置样式及未写 loopMs 的自定义样式使用；声呐/心跳/轨道使用固定周期", "en": "200–3000 ms, default 700 ms; built-ins and custom styles without loopMs use this; Ping/Heartbeat/Orbit have fixed cycles"},
       "default": 700
     },
     {
@@ -140,7 +143,7 @@
       "key": "customStyle",
       "type": "text",
       "title": {"zh": "自定义样式（JSON）", "en": "Custom style (JSON)"},
-      "hint": {"zh": "动效样式选“自定义”时生效；声明式 JSON，语法和示例见 README；解析失败自动回退上一有效样式", "en": "used when the effect style is custom; declarative JSON, syntax and examples in the README; a parse failure keeps the previous style"},
+      "hint": {"zh": "选择“自定义”时生效，语法见 README；解析失败保留上一有效自定义样式，无历史时用圆环；清空会清除回退样式", "en": "used for Custom; see README for syntax; invalid JSON keeps the last valid custom style or falls back to Ring; clearing resets the fallback"},
       "default": ""
     }
   ]

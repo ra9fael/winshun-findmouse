@@ -76,10 +76,13 @@ inline int clampInt(long long v, int lo, int hi)
 // StyleDoc below); if it is missing or fails to parse the renderer falls
 // back to Ring, never to a blank overlay.
 enum class Effect {
-    Ring, // pulsing expanding ring (the default)
+    Ring, // pulsing expanding ring (safe fallback)
     Waves, // three staggered expanding ripples
     Halo, // breathing soft glow disc around the pointer
     Radar, // rotating sonar sweep inside a static circle
+    Ping, // DSL preset: fast ring plus a slow echo (presets.h)
+    Heart, // default DSL preset: lub-dub double beat (presets.h)
+    Orbit, // DSL preset: two counter-rotating sweeps (presets.h)
     Custom // layers from the user's customStyle JSON
 };
 
@@ -93,6 +96,12 @@ inline const char* effectName(Effect e)
         return "halo";
     case Effect::Radar:
         return "radar";
+    case Effect::Ping:
+        return "ping";
+    case Effect::Heart:
+        return "heart";
+    case Effect::Orbit:
+        return "orbit";
     case Effect::Custom:
         return "custom";
     case Effect::Ring:
@@ -113,9 +122,20 @@ inline Effect parseEffect(std::string s)
         return Effect::Halo;
     if (s == "radar")
         return Effect::Radar;
+    if (s == "ping")
+        return Effect::Ping;
+    if (s == "heart")
+        return Effect::Heart;
+    if (s == "orbit")
+        return Effect::Orbit;
     if (s == "custom")
         return Effect::Custom;
     return Effect::Ring;
+}
+
+inline bool usesStyleDoc(Effect e)
+{
+    return e == Effect::Custom || e == Effect::Ping || e == Effect::Heart || e == Effect::Orbit;
 }
 
 // ---------- Custom style DSL ----------
@@ -257,6 +277,21 @@ struct StyleDoc {
     std::vector<StyleLayer> layers;
 };
 
+// Sweeps keep their fractional turns across pulse boundaries. Wrapping the
+// pulse first makes a speed such as -0.6 jump back every loop.
+inline double sweepAngle(double cycles, double phase, double speed)
+{
+    constexpr double twoPi = 6.28318530717958647692;
+    return twoPi * std::fmod((cycles + phase) * speed, 1.0);
+}
+
+inline double sweepTrailAngle(double theta, double angle, double speed)
+{
+    constexpr double twoPi = 6.28318530717958647692;
+    double rel = std::fmod((theta - angle) * (speed < 0.0 ? -1.0 : 1.0), twoPi);
+    return rel < 0.0 ? rel + twoPi : rel;
+}
+
 // Strict: any unknown shape/mode/color or a missing/empty "layers" fails the
 // whole document, so typos surface in diagnostics instead of half-rendering.
 constexpr std::size_t kMaxStyleLayers = 12;
@@ -360,7 +395,7 @@ inline bool parseStyleDoc(const winshun::Json& j, StyleDoc& out)
 struct Settings {
     bool shakeEnabled = true;
     ShakeConfig shake; // already sanitized
-    Effect effect = Effect::Ring;
+    Effect effect = Effect::Heart;
     int rippleMs = 700; // 200..3000
     int rippleSize = 64; // ring's outer radius at rest, px at 96 dpi; 24..256
     int followTimeoutMs = 3000; // auto-dismiss; 0 = follow until a mouse button
@@ -412,7 +447,7 @@ inline Settings readSettings(const winshun::Json& s)
     ShakeConfig c;
     c.windowMs = numClamped("shakeWindowMs", 80, 2000, c.windowMs);
     c.minReversals = numClamped("shakeReversals", 2, static_cast<int>(kMaxReversals), c.minReversals);
-    c.strokePx = numClamped("shakeStrokePx", 2, 200, c.strokePx);
+    c.strokePx = numClamped("shakeStrokePx", 2, 600, c.strokePx);
     c.cooldownMs = numClamped("shakeCooldownMs", 0, 10000, c.cooldownMs);
     c.minSpeedPxS = numClamped("shakeMinSpeed", 0, 20000, c.minSpeedPxS);
     out.shake = sanitized(c);
