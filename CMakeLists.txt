@@ -14,7 +14,7 @@ endif()
 
 # The generated C++ template builds the exe straight into the plugin folder,
 # because plugin.json names it as runtime.program. Keep that convention.
-add_executable(findmouse main.cpp mouse_hook.cpp ripple_overlay.cpp)
+add_executable(findmouse main.cpp mouse_hook.cpp ripple_overlay.cpp findmouse.rc)
 # GetTickCount64, per-monitor DPI and the X-button messages want a modern SDK
 # baseline; the host itself is Win10+ anyway.
 target_compile_definitions(findmouse PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN

@@ -3,7 +3,7 @@
   "manifest": 1,
   "id": "ra9fael.findmouse",
   "name": {"zh": "晃动找鼠标", "en": "Find My Mouse"},
-  "version": "0.4.4",
+  "version": "0.4.5",
   "minWinShun": "0.22.0",
   "description": {
     "zh": "快速左右晃动鼠标时在指针位置显示一圈涟漪动效，帮助找回光标；也提供 mouse 关键字手动触发、开关检测和诊断",
