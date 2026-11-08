@@ -7,6 +7,50 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-11-08
+
+### Added
+- Ping, Heartbeat and Orbit presets in the effect dropdown, using validated
+  declarative layers with 1100/1400/1600 ms cycles. Diagnostics show the
+  active document's layer count and cycle.
+- Manifest/registry consistency checks and protocol regressions for preset
+  startup, live switching and custom fallback across effects.
+
+### Fixed
+- Initial overlay settings could be dropped before the worker's window and
+  message queue existed. Startup now waits for readiness; queued style
+  payloads are released on failed delivery and shutdown.
+- Invalid custom JSON after a preset could reuse that preset, while switching
+  through a built-in lost the previous user fallback. The last valid custom
+  document is now independent of the active preset; clearing JSON clears it.
+- Fractional-speed sweeps no longer jump at cycle boundaries; negative-speed
+  trails follow the rotation. Registry lookup accepts mixed-case ids.
+
+### 中文说明
+- 新增声呐、心跳、轨道三种可选预设；诊断显示有效图层和周期。
+- 默认效果改为心跳（1400 ms）；升级保留用户已保存的效果选择。
+- 修复初始设置投递过早、自定义样式回退被预设覆盖、扫描跨周期跳回和反向尾迹方向。
+- 补齐 manifest 一致性、预设启动、动态切换和自定义回退测试。
+- 默认晃动阈值为 400 ms 内 6 次换向、80 px 行程、1000 px/s 速度门槛；真人误触发率仍需实测。
+
+### Changed
+- Heartbeat is now the default effect (1400 ms cycle). Saved effect choices
+  are preserved on upgrade; Ring remains the fallback for invalid effect ids
+  or invalid custom JSON without a previously valid document.
+- The shake thresholds default to the revised values: 6 reversals inside a
+  400 ms window (was 4 in 300 ms), a 1000 px/s speed gate (was 500) and an
+  80 px stroke (was 8). Synthetic trajectories exercise recognition and
+  rejection; real-user gesture feel and false-positive rates are not measured.
+  An earlier untagged draft used a 600 px stroke; the working default is 80 px.
+- `shakeStrokePx` accepts up to 600 px (was 200), so a deliberately wide
+  personal tuning still fits its own range.
+
+### Known limitations
+- Physical gesture feel and false-positive rates, mixed-DPI monitor transitions,
+  exclusive fullscreen and elevated-window behavior were not revalidated this release.
+- Comet, Spotlight and Pin remain design concepts, not selectable effects.
+- 真人手势与误触发率、跨屏 DPI、独占全屏和提权窗口需进一步人工验证；彗尾、聚光灯和图钉尚未实现。
+
 ## [0.4.3] - 2026-11-07
 
 ### Fixed
@@ -94,7 +138,8 @@ published; they are listed below for context.
   overlay, and the `mouse` / `找鼠标` keyword (show beacon, toggle detection,
   copy diagnostics).
 
-[Unreleased]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/ra9fael/winshun-findmouse/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ra9fael/winshun-findmouse/releases/tag/v0.4.1
