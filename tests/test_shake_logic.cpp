@@ -3,11 +3,15 @@
 // positions with a synthetic monotonic clock.
 //
 // Build & run: cmake --build build --config Release && ctest --test-dir build
+#include "../presets.h"
 #include "../shake_logic.h"
 #include "../settings.h"
 
 #include <cmath>
 #include <cstdio>
+#include <fstream>
+#include <sstream>
+#include <set>
 #include <string>
 
 using namespace fm;
@@ -51,13 +55,30 @@ void test_configSanitized()
 
     c = sanitized(ShakeConfig { 99999, 99, 9999, 99999, 999999 });
     check(c.windowMs == 2000 && c.minReversals == static_cast<int>(kMaxReversals)
-            && c.strokePx == 200 && c.cooldownMs == 10000 && c.minSpeedPxS == 20000,
+            && c.strokePx == 600 && c.cooldownMs == 10000 && c.minSpeedPxS == 20000,
         "sanitized: above-range values clamp to upper bounds");
 
-    c = sanitized(ShakeConfig { 300, 4, 8, 1500, 500 });
-    check(c.windowMs == 300 && c.minReversals == 4 && c.strokePx == 8 && c.cooldownMs == 1500
-            && c.minSpeedPxS == 500,
+    c = sanitized(ShakeConfig { 400, 6, 300, 1500, 1000 });
+    check(c.windowMs == 400 && c.minReversals == 6 && c.strokePx == 300 && c.cooldownMs == 1500
+            && c.minSpeedPxS == 1000,
         "sanitized: sane values pass through");
+}
+
+void test_defaultConfigRecognizesShake()
+{
+    ShakeDetector d; // the shipped defaults, unsanitized by any settings
+    // ±100 px swings 40 ms apart: 200 px per stroke is 5000 px/s, well over
+    // the 1000 px/s gate, and the 6 reversals span 240 ms inside the 400 ms
+    // window. This is the gesture the default thresholds ask the user for —
+    // a firm wrist whip, reachable by hand (unlike the 600 px stroke that
+    // needed ~16500 px/s sustained and shipped in 0.4.4 unreleased).
+    feedShake(d, 0, 40, 100, 8);
+    check(d.stats().triggers == 1, "defaults: a wrist-scale fast whip triggers once");
+    check(d.stats().reversals == 6, "defaults: 6 reversals counted");
+    // Half the amplitude is below strokePx, so the same rhythm must not fire.
+    ShakeDetector half;
+    feedShake(half, 0, 40, 35, 8);
+    check(half.stats().triggers == 0, "defaults: a narrow wiggle stays silent");
 }
 
 void test_recognizesShake()
@@ -198,8 +219,9 @@ void test_readSettings()
 {
     // All defaults on an empty object.
     const Settings def = readSettings(winshun::Json(winshun::Json::Object {}));
-    check(def.shakeEnabled && def.shake.windowMs == 300 && def.shake.minReversals == 4
-            && def.shake.strokePx == 8 && def.shake.cooldownMs == 1500 && def.shake.minSpeedPxS == 500,
+    check(def.shakeEnabled && def.shake.windowMs == 400 && def.shake.minReversals == 6
+            && def.shake.strokePx == 80 && def.shake.cooldownMs == 1500
+            && def.shake.minSpeedPxS == 1000,
         "settings: missing keys give the defaults");
     check(def.rippleMs == 700 && def.rippleSize == 64 && def.accent.r == 0x2A,
         "settings: ripple defaults hold");
@@ -232,16 +254,25 @@ void test_readSettings()
     const Settings str = readSettings(winshun::Json(std::move(asStrings)));
     check(str.shake.minReversals == 6 && str.rippleMs == 500, "settings: stringified numbers accepted");
 
-    check(shakeConfigOf(def).minReversals == 4, "settings: shakeConfigOf maps through");
+    check(shakeConfigOf(def).minReversals == 6, "settings: shakeConfigOf maps through");
 
     // Effect parsing: all names, case-insensitivity, and the garbage fallback.
-    check(def.effect == Effect::Ring, "settings: missing effect defaults to ring");
+    check(def.effect == Effect::Heart, "settings: missing effect defaults to heartbeat");
     winshun::Json::Object eff { {"rippleEffect", "radar"} };
     check(readSettings(winshun::Json(std::move(eff))).effect == Effect::Radar,
         "settings: radar parsed");
     winshun::Json::Object eff2 { {"rippleEffect", "WAVES"} };
     check(readSettings(winshun::Json(std::move(eff2))).effect == Effect::Waves,
         "settings: effect names are case-insensitive");
+    winshun::Json::Object effPing { {"rippleEffect", "ping"} };
+    check(readSettings(winshun::Json(std::move(effPing))).effect == Effect::Ping,
+        "settings: ping preset parsed");
+    winshun::Json::Object effHeart { {"rippleEffect", "Heart"} };
+    check(readSettings(winshun::Json(std::move(effHeart))).effect == Effect::Heart,
+        "settings: heart preset case-insensitive");
+    winshun::Json::Object effOrbit { {"rippleEffect", "orbit"} };
+    check(readSettings(winshun::Json(std::move(effOrbit))).effect == Effect::Orbit,
+        "settings: orbit preset parsed");
     winshun::Json::Object eff3 { {"rippleEffect", "sparkles"} };
     const Settings effFall = readSettings(winshun::Json(std::move(eff3)));
     check(effFall.effect == Effect::Ring, "settings: unknown effect falls back to ring");
@@ -264,6 +295,34 @@ void test_readSettings()
     winshun::Json::Object eff6 { {"customStyle", "{\"layers\":[{\"shape\":\"disc\"}]}"} };
     check(readSettings(winshun::Json(std::move(eff6))).customStyleText.find("disc") != std::string::npos,
         "settings: customStyle text carried through");
+}
+
+void test_effectRegistry()
+{
+    // Every DslPreset row must carry a document that the strict parser
+    // accepts — a typo here would silently render the ring fallback forever.
+    for (const fm::EffectInfo& e : fm::effectRegistry()) {
+        std::string label = std::string("registry: ") + e.id + " row is well-formed";
+        bool ok = e.id && *e.id && e.nameZh && *e.nameZh && e.nameEn && *e.nameEn;
+        if (e.kind == fm::EffectInfo::Kind::DslPreset) {
+            const auto doc = fm::presetDoc(e);
+            ok = ok && doc && !doc->layers.empty() && doc->layers.size() <= 6;
+        } else {
+            ok = ok && !e.doc;
+        }
+        check(ok, label);
+    }
+    // Built-in ids and preset ids must be unique.
+    const auto& reg = fm::effectRegistry();
+    for (std::size_t i = 0; i < reg.size(); ++i)
+        for (std::size_t j = i + 1; j < reg.size(); ++j)
+            check(std::string(reg[i].id) != std::string(reg[j].id),
+                std::string("registry: unique id ") + reg[i].id);
+    // Lookup matches parseEffect's names, case-insensitively.
+    check(fm::findEffectInfo("ping") != nullptr, "registry: ping found");
+    check(fm::findEffectInfo("PING") != nullptr, "registry: lookup is case-insensitive");
+    check(fm::findEffectInfo("sparkles") == nullptr, "registry: unknown id not found");
+    check(fm::effectRegistry().size() == 10, "registry: row count is 10");
 }
 
 void test_styleDoc()
@@ -360,12 +419,78 @@ void test_styleDoc()
     check(std::abs(evalAlpha(a, 0.25) - 0.8) < eps, "alpha: sin peaks at p=0.25");
 }
 
+void test_sweepContinuity()
+{
+    constexpr double twoPi = 6.28318530717958647692;
+    for (double speed : { -0.6, 1.0, 2.5 }) {
+        const double before = sweepAngle(0.99999, 0.0, speed);
+        const double after = sweepAngle(1.00001, 0.0, speed);
+        check(std::abs(std::remainder(after - before, twoPi)) < 0.001,
+            "sweep: fractional speed stays continuous across a loop");
+    }
+    check(std::abs(sweepAngle(1.25, 0.25, -0.6) + twoPi * 0.9) < 1e-9,
+        "sweep: phase and negative speed both apply");
+    check(std::abs(sweepTrailAngle(0.0, -0.2, 1.0) - 0.2) < 1e-9,
+        "sweep: clockwise trail follows behind the needle");
+    check(std::abs(sweepTrailAngle(0.0, 0.2, -0.6) - 0.2) < 1e-9,
+        "sweep: counter-clockwise trail follows behind the needle");
+    check(sweepTrailAngle(0.0, -0.2, -0.6) > 6.0,
+        "sweep: counter-clockwise trail does not lead the needle");
+}
+
+void test_manifest(const char* path)
+{
+    std::ifstream file(path, std::ios::binary);
+    std::stringstream text;
+    text << file.rdbuf();
+    const auto manifest = winshun::Json::parse(text.str());
+    check(file.good() && manifest && (*manifest)["settings"].isArray(),
+        "manifest: settings document loads");
+    if (!manifest || !(*manifest)["settings"].isArray())
+        return;
+    std::set<std::string> expected { "custom" }, actual;
+    for (const auto& e : effectRegistry()) {
+        if (e.kind == EffectInfo::Kind::Planned) {
+            check(parseEffect(e.id) == Effect::Ring && !presetDoc(e),
+                std::string("manifest: planned effect stays unavailable: ") + e.id);
+        } else {
+            expected.insert(e.id);
+            check(effectName(parseEffect(e.id)) == std::string(e.id),
+                std::string("manifest: selectable effect round-trips: ") + e.id);
+        }
+    }
+    winshun::Json::Object defaults;
+    for (const auto& setting : (*manifest)["settings"].toArray()) {
+        defaults[setting["key"].toString()] = setting["default"];
+        if (setting["key"].toString() != "rippleEffect")
+            continue;
+        for (const auto& option : setting["options"].toArray()) {
+            check(actual.insert(option["value"].toString()).second,
+                "manifest: no duplicate effect options");
+            check(!option["title"]["zh"].toString().empty() && !option["title"]["en"].toString().empty(),
+                "manifest: effect labels are bilingual");
+        }
+    }
+    check(actual == expected, "manifest: dropdown exactly matches implemented effects plus custom");
+    const auto s = readSettings(winshun::Json(std::move(defaults)));
+    const Settings fallback;
+    check(s.shake.windowMs == fallback.shake.windowMs && s.shake.minReversals == fallback.shake.minReversals
+        && s.shake.strokePx == fallback.shake.strokePx && s.shake.minSpeedPxS == fallback.shake.minSpeedPxS
+        && s.shake.cooldownMs == fallback.shake.cooldownMs,
+        "manifest: shake defaults match the detector defaults");
+    check(s.effect == fallback.effect && s.rippleMs == fallback.rippleMs && s.rippleSize == fallback.rippleSize
+        && s.followTimeoutMs == fallback.followTimeoutMs && s.fadeOutMs == fallback.fadeOutMs
+        && s.accentText == fallback.accentText,
+        "manifest: rendering defaults match runtime defaults");
+}
+
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
     std::printf("ra9fael.findmouse logic tests\n");
     test_configSanitized();
+    test_defaultConfigRecognizesShake();
     test_recognizesShake();
     test_oneTriggerPerGesture();
     test_slowMovementNeverFires();
@@ -375,8 +500,12 @@ int main()
     test_reversalSpanUsesNewestEntries();
     test_configSwapMidStream();
     test_parseColor();
+    test_effectRegistry();
     test_readSettings();
     test_styleDoc();
+    test_sweepContinuity();
+    if (argc > 1)
+        test_manifest(argv[1]);
     std::printf("%d passed, %d failed\n", g_passed, g_failed);
     return g_failed == 0 ? 0 : 1;
 }

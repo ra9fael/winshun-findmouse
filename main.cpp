@@ -16,12 +16,14 @@
 // Code and comments are English; user-visible strings are localized with the
 // host locale (Chinese by default, English when the locale starts with "en").
 #include "mouse_hook.h"
+#include "presets.h"
 #include "ripple_overlay.h"
 #include "settings.h"
 #include "shake_logic.h"
 #include "winshun.h"
 
 #include <windows.h>
+#include <tlhelp32.h>
 
 #include <algorithm>
 #include <atomic>
@@ -35,7 +37,7 @@
 namespace {
 
 constexpr const char* kPluginName = "ra9fael.findmouse";
-constexpr const char* kVersion = "0.4.1";
+constexpr const char* kVersion = "0.4.4";
 constexpr int kStateVersion = 1; // state.json format version, not the plugin version
 
 using fm::MouseHook;
@@ -55,14 +57,91 @@ bool containsFold(const std::string& haystackLower, const std::string& needleLow
     return needleLower.empty() || haystackLower.find(needleLower) != std::string::npos;
 }
 
+// ---------- Host integrity (UIPI) ----------
+//
+// The plugin runs at medium integrity: the runner de-elevates to an Explorer
+// token whenever Win顺 itself is elevated. Windows UIPI then hides all input
+// whose destination is an elevated window — the low-level mouse hook receives
+// nothing and GetAsyncKeyState reads nothing while an elevated window (the
+// Win顺 settings dialog, the launcher) has focus. Both shake triggering and
+// click-to-dismiss die silently in that state, so the plugin detects it and
+// says so instead of leaving a mute detector.
+
+enum class HostIntegrity { Unknown, Medium, High };
+
+struct HostInfo {
+    HostIntegrity integrity = HostIntegrity::Unknown;
+    std::string exe; // ASCII, diagnostics only
+};
+
+HostInfo queryHostIntegrity()
+{
+    const DWORD self = ::GetCurrentProcessId();
+    struct Proc {
+        DWORD pid = 0;
+        DWORD parent = 0;
+        std::wstring exe;
+    };
+    std::vector<Proc> procs;
+    const HANDLE snap = ::CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snap != INVALID_HANDLE_VALUE) {
+        PROCESSENTRY32W pe {};
+        pe.dwSize = sizeof(pe);
+        if (::Process32FirstW(snap, &pe)) {
+            do {
+                procs.push_back({ pe.th32ProcessID, pe.th32ParentProcessID, pe.szExeFile });
+            } while (::Process32NextW(snap, &pe));
+        }
+        ::CloseHandle(snap);
+    }
+    const auto find = [&procs](DWORD pid) -> const Proc* {
+        for (const Proc& p : procs)
+            if (p.pid == pid)
+                return &p;
+        return nullptr;
+    };
+    const Proc* me = find(self);
+    const Proc* runner = me ? find(me->parent) : nullptr;
+    const Proc* host = runner && runner->pid != self ? find(runner->parent) : nullptr;
+    if (me == nullptr || runner == nullptr || host == nullptr || host->pid == self)
+        return {};
+
+    HostInfo info;
+    info.exe.reserve(host->exe.size());
+    for (wchar_t c : host->exe)
+        info.exe.push_back(c <= 0x7F ? static_cast<char>(c) : '?');
+
+    const HANDLE proc = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, host->pid);
+    if (!proc)
+        return info; // exe known, integrity not readable across the boundary
+    HANDLE token = nullptr;
+    if (::OpenProcessToken(proc, TOKEN_QUERY, &token)) {
+        DWORD need = 0;
+        ::GetTokenInformation(token, TokenIntegrityLevel, nullptr, 0, &need);
+        if (need > 0) {
+            std::vector<BYTE> buffer(need);
+            if (::GetTokenInformation(token, TokenIntegrityLevel, buffer.data(), need, &need)) {
+                const auto label = reinterpret_cast<PTOKEN_MANDATORY_LABEL>(buffer.data());
+                const DWORD count = *::GetSidSubAuthorityCount(label->Label.Sid);
+                const DWORD rid = *::GetSidSubAuthority(label->Label.Sid, static_cast<DWORD>(count - 1));
+                info.integrity = rid >= SECURITY_MANDATORY_HIGH_RID ? HostIntegrity::High : HostIntegrity::Medium;
+            }
+        }
+        ::CloseHandle(token);
+    }
+    ::CloseHandle(proc);
+    return info;
+}
+
 class FindMousePlugin : public winshun::Plugin {
 public:
     std::string name() const override { return kPluginName; }
 
     void initialized() override
     {
+        m_host = queryHostIntegrity();
         m_settings = fm::readSettings(settings());
-        reparseCustomStyle();
+        resolveActiveStyle();
         loadState();
         startWorkers();
     }
@@ -70,13 +149,13 @@ public:
     void settingsChanged(const winshun::Json& s) override
     {
         m_settings = fm::readSettings(s);
-        reparseCustomStyle();
+        resolveActiveStyle();
         m_shakeEnabled = m_settings.shakeEnabled; // the settings UI is an explicit user choice too
         if (m_hookStarted)
             m_hook.updateConfig(m_settings.shake);
         m_hook.setEnabled(m_shakeEnabled);
         if (m_overlay.active())
-            m_overlay.updateStyle(m_settings, m_customStyle);
+            m_overlay.updateStyle(m_settings, m_activeStyle);
         saveState();
     }
 
@@ -124,6 +203,15 @@ public:
                     : "Hook state, gesture counters and settings · Shift+Enter",
             "glyph:U+E946", 70 });
 
+        if (m_host.integrity == HostIntegrity::High) {
+            rows.push_back({ "elevatedNotice",
+                chinese ? "Win顺 提权中：提权窗口上晃动不触发、点击不消失"
+                        : "Win顺 runs elevated: shakes and clicks on elevated windows are invisible",
+                chinese ? "Windows UIPI 限制，不是插件缺陷；以普通权限运行 Win顺 即可恢复 · Enter 详情"
+                        : "A Windows UIPI limit, not a plugin bug; run Win顺 without elevation to restore · Enter for details",
+                "glyph:U+E7BA", 60 });
+        }
+
         const std::string needle = toLowerAscii(q.text);
         winshun::Items items;
         for (const Row& row : rows) {
@@ -149,7 +237,7 @@ public:
                 return { winshun::effect::notify(tr("无法获取鼠标位置", "Could not read the pointer position")), effectKeep() };
             if (!m_overlay.active()) {
                 m_overlay.start();
-                m_overlay.updateStyle(m_settings, m_customStyle);
+                m_overlay.updateStyle(m_settings, m_activeStyle);
             }
             m_manualTriggers.fetch_add(1); // counted separately from hook gestures
             m_overlay.request(pt.x, pt.y);
@@ -168,6 +256,15 @@ public:
             return { winshun::effect::copy(text),
                 winshun::effect::notify(tr("已复制诊断信息", "Diagnostics copied")), effectHide() };
         }
+        if (a.action == "elevatedNotice") {
+            return { winshun::effect::notify(tr(
+                "Windows UIPI：本插件以中等完整性运行，焦点在提权窗口（Win顺 设置、启动器等）时晃动与点击都感知不到，"
+                "信标靠自动消失时间（默认 3000 ms）兜底。以普通权限运行 Win顺 即可完全恢复。",
+                "Windows UIPI: this plugin runs at medium integrity. While an elevated window (Win顺 settings, the "
+                "launcher) has focus, shakes and clicks cannot be seen and only the auto-dismiss timeout (default "
+                "3000 ms) ends the beacon. Run Win顺 without elevation to restore everything.")),
+                effectKeep() };
+        }
         return Plugin::action(a);
     }
 
@@ -179,13 +276,31 @@ private:
 
     std::string tr(const char* zh, const char* en) const { return chinese() ? zh : en; }
 
-    // Parse the customStyle setting into a StyleDoc. On failure the previous
-    // good document stays active (and Custom renders its ring fallback if
-    // there never was one); never throws, never blanks the overlay.
-    void reparseCustomStyle()
+    // Resolve the active StyleDoc for the current effect. DSL presets take
+    // their document from the registry (presets.h); Custom parses the
+    // user's customStyle setting. Keep the last valid user document separate
+    // from the selected preset so an invalid custom edit never adopts a
+    // preset, and switching through a built-in never loses the user fallback.
+    void resolveActiveStyle()
     {
+        if (m_settings.effect == fm::Effect::Ping || m_settings.effect == fm::Effect::Heart
+            || m_settings.effect == fm::Effect::Orbit) {
+            const fm::EffectInfo* e = fm::findEffectInfo(fm::effectName(m_settings.effect));
+            m_activeStyle = e ? fm::presetDoc(*e) : nullptr;
+            m_customStatus = m_activeStyle ? std::string("preset (") + e->id + ")"
+                                          : "preset error (ring fallback)";
+            if (!m_activeStyle)
+                log("warn", "ra9fael.findmouse: preset unavailable; using the ring fallback");
+            return;
+        }
+        if (m_settings.effect != fm::Effect::Custom) {
+            m_activeStyle.reset();
+            m_customStatus = "none";
+            return;
+        }
         if (m_settings.customStyleText.empty()) {
             m_customStyle.reset();
+            m_activeStyle.reset();
             m_customStatus = "none";
             return;
         }
@@ -197,14 +312,16 @@ private:
         } else {
             if (!m_customStyle)
                 log("warn", "ra9fael.findmouse: customStyle parse failed; using the ring fallback");
-            m_customStatus = "parse error (previous style kept)";
+            m_customStatus = m_customStyle ? "parse error (previous custom style kept)"
+                                          : "parse error (ring fallback)";
         }
+        m_activeStyle = m_customStyle;
     }
 
     void startWorkers()
     {
         m_overlay.start();
-        m_overlay.updateStyle(m_settings, m_customStyle);
+        m_overlay.updateStyle(m_settings, m_activeStyle);
         m_hookStarted = m_hook.start(m_settings.shake, [this](int x, int y) {
             m_overlay.request(x, y); // enqueue + post: fast enough for the hook
         });
@@ -277,6 +394,12 @@ private:
         o << "version: " << kVersion << "\n";
         o << "hook installed: " << (m_hookStarted ? "yes" : "no") << "\n";
         o << "hook thread alive: " << (m_hook.active() ? "yes" : "no") << "\n";
+        o << "host process: " << (m_host.exe.empty() ? "unknown" : m_host.exe) << ", integrity: "
+          << (m_host.integrity == HostIntegrity::High
+                  ? "high (elevated; UIPI hides input aimed at elevated windows — shake and click-to-dismiss are blind while an elevated window has focus)"
+                  : m_host.integrity == HostIntegrity::Medium ? "medium"
+                                                              : "unknown")
+          << "\n";
         o << "shake detection: " << (m_hook.enabled() ? "enabled" : "disabled") << "\n";
         o << "moves seen: " << st.moves << "\n";
         o << "reversals: " << st.reversals << "\n";
@@ -291,6 +414,11 @@ private:
           << "ms (0 = until a mouse button), fade out: " << m_settings.fadeOutMs
           << "ms (0 = instant)\n";
         o << "custom style: " << m_customStatus << "\n";
+        if (m_activeStyle)
+            o << "style document: " << m_activeStyle->layers.size() << " layers, loop="
+              << (m_activeStyle->loopMs > 0 ? m_activeStyle->loopMs : m_settings.rippleMs) << "ms\n";
+        else
+            o << "style document: none\n";
         o << "locale: " << locale() << ", theme: " << theme() << "\n";
         o << "dataDir: " << dataDir() << "\n";
         return o.str();
@@ -299,8 +427,10 @@ private:
     Settings m_settings;
     bool m_shakeEnabled = true;
     bool m_hookStarted = false;
+    HostInfo m_host; // parent-chain integrity probe, taken once at startup
     std::atomic<long long> m_manualTriggers { 0 }; // ripples shown via showNow, not the hook
     std::shared_ptr<const fm::StyleDoc> m_customStyle; // parsed customStyle JSON
+    std::shared_ptr<const fm::StyleDoc> m_activeStyle; // selected preset or last valid custom doc
     std::string m_customStatus = "none"; // echoed in diagnostics
     fm::MouseHook m_hook;
     fm::RippleOverlay m_overlay;

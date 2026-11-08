@@ -10,8 +10,8 @@
 #     actually shows on showNow (checked via Win32 from this process)
 #   * garbage lines and unknown methods do not kill the process
 #
-# No real mouse input is injected: the physical gesture path is verified by
-# the WinShun message log / manual use, not here.
+# The follow check briefly moves and restores the cursor. Physical gestures
+# still need manual verification; no clicks or keystrokes are injected.
 
 import json
 import os
@@ -21,6 +21,7 @@ import tempfile
 import threading
 import time
 import ctypes
+from pathlib import Path
 from ctypes import wintypes
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -109,14 +110,25 @@ class Driver:
         self._id += 1
         rid = self._id
         self._send({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
-        while True:
-            msg = self.recv(timeout)
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            msg = self.recv(max(0, deadline - time.monotonic()))
             if msg is None:
                 return None
             if msg.get("id") == rid:
                 return msg
             # notifications (winshun/log ...) are collected, not dropped
             self.stderr_tail.append(msg)
+        return None
+
+    def settings_changed(self, settings):
+        self._send({"jsonrpc": "2.0", "method": "settingsChanged",
+                    "params": {"settings": settings}})
+
+    def diagnostics(self):
+        response = self.action("copyDiagnostics") or {}
+        return next((e.get("text", "") for e in response.get("result", {}).get("effects", [])
+                     if e.get("type") == "copy"), "")
 
     def initialize(self, settings=None, locale="en", theme="light"):
         return self.request("initialize", {
@@ -142,14 +154,20 @@ class Driver:
         })
 
     def close(self):
-        try:
-            self._send({"jsonrpc": "2.0", "id": 99999, "method": "shutdown", "params": {}})
-        except OSError:
-            pass
+        if self.proc.poll() is None:
+            try:
+                self._send({"jsonrpc": "2.0", "id": 99999, "method": "shutdown", "params": {}})
+            except OSError:
+                pass
         try:
             self.proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             self.proc.kill()
+            self.proc.wait(timeout=5)
+        self._reader.join(timeout=2)
+        for pipe in (self.proc.stdin, self.proc.stdout, self.proc.stderr):
+            if pipe:
+                pipe.close()
 
 
 def state_content(data_dir):
@@ -160,18 +178,12 @@ def state_content(data_dir):
         return f.read()
 
 
-def main():
-    if not os.path.exists(EXE):
-        print(f"findmouse.exe not found at {EXE}; build first.")
-        return 1
-    data_dir = tempfile.mkdtemp(prefix="findmouse-test-")
-    drv = Driver(data_dir)
-
+def run(drv, data_dir):
     print("== initialize ==")
-    init = drv.initialize()
+    init = drv.initialize({"followTimeoutMs": 0})
     check(init is not None and init.get("result", {}).get("protocolVersion") == "1",
           "initialize answers protocolVersion 1", str(init))
-    check(init.get("result", {}).get("name") == "ra9fael.findmouse",
+    check((init or {}).get("result", {}).get("name") == "ra9fael.findmouse",
           "initialize answers the plugin name", str(init))
     time.sleep(0.3)  # give the worker threads a beat
 
@@ -200,6 +212,7 @@ def main():
           "rows use glyph icons (no binary assets needed)")
     time.sleep(0.2)
     check(state_content(data_dir) == before, "query wrote no state file")
+    check(not ctypes.windll.user32.IsWindowVisible(hwnd), "query did not show the beacon")
 
     print("== query: text filters rows ==")
     resp = drv.query("diag")
@@ -234,21 +247,25 @@ def main():
 
     tracked = False
     detail = ""
-    for attempt in range(3):
-        pt0 = POINT()
-        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt0))
-        ctypes.windll.user32.SetCursorPos(pt0.x + 120, pt0.y + 80)
-        time.sleep(0.35)  # a few follow frames
-        rect = wintypes.RECT()
-        ok_rect = ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
-        cx, cy = (rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2
-        detail = f"center=({cx},{cy}) expected≈({pt0.x + 120},{pt0.y + 80})"
-        if bool(ok_rect) and abs(cx - (pt0.x + 120)) <= 6 and abs(cy - (pt0.y + 80)) <= 6:
-            tracked = True
-            break
-        time.sleep(0.2)
+    pt0 = POINT()
+    ctypes.windll.user32.GetCursorPos(ctypes.byref(pt0))
+    try:
+        for attempt in range(3):
+            ctypes.windll.user32.SetCursorPos(pt0.x + 120, pt0.y + 80)
+            time.sleep(0.15)
+            target = POINT()
+            ctypes.windll.user32.GetCursorPos(ctypes.byref(target))
+            rect = wintypes.RECT()
+            ok_rect = ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+            cx, cy = (rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2
+            detail = f"center=({cx},{cy}) cursor=({target.x},{target.y})"
+            if bool(ok_rect) and abs(cx - target.x) <= 6 and abs(cy - target.y) <= 6:
+                tracked = True
+                break
+            time.sleep(0.2)
+    finally:
+        ctypes.windll.user32.SetCursorPos(pt0.x, pt0.y)
     check(tracked, "beacon re-centers on the moved cursor", detail)
-    ctypes.windll.user32.SetCursorPos(pt0.x, pt0.y)
     time.sleep(0.3)  # a few follow frames; still visible (no click yet)
     check(hwnd and ctypes.windll.user32.IsWindowVisible(hwnd),
           "beacon stays visible until a button is pressed")
@@ -280,6 +297,9 @@ def main():
     check("moves seen:" in text and "ripples triggered: 1" in text,
           "diagnostics carry the gesture counters", text)
     check("accent=#2AA8FF" in text, "diagnostics echo the default accent", text)
+    check("effect=heart" in text and "custom style: preset (heart)" in text
+          and "style document: 3 layers, loop=1400ms" in text,
+          "omitted effect selects the default heartbeat document", text)
     check(not any(e.get("type") in ("open", "setQuery") for e in effects),
           "copyDiagnostics does not open anything or rewrite the query")
 
@@ -328,7 +348,40 @@ def main():
     resp = drv.action("showNow")
     time.sleep(0.25)
     check(hwnd and ctypes.windll.user32.IsWindowVisible(hwnd),
-          "beacon still visible after a bad customStyle (ring fallback)")
+          "beacon still visible after a bad customStyle (previous custom retained)")
+
+    print("== presets: live switching and custom fallback isolation ==")
+    for effect, loop in (("ping", 1100), ("heart", 1400), ("orbit", 1600)):
+        drv.settings_changed({"rippleEffect": effect, "followTimeoutMs": 0})
+        text = drv.diagnostics()  # the response is a barrier after settingsChanged
+        check(f"effect={effect}" in text and f"custom style: preset ({effect})" in text,
+              f"{effect}: selection resolves to the preset", text)
+        check(f"style document: 3 layers, loop={loop}ms" in text,
+              f"{effect}: runtime selects the validated preset document", text)
+        drv.action("showNow")
+        time.sleep(0.15)
+        check(ripple_windows_of_pid(drv.proc.pid) == [hwnd] and ctypes.windll.user32.IsWindowVisible(hwnd),
+              f"{effect}: reuses the visible overlay")
+        drv.settings_changed({"rippleEffect": "custom", "customStyle": "not json"})
+        text = drv.diagnostics()
+        check("parse error (previous custom style kept)" in text
+              and "style document: 2 layers, loop=600ms" in text,
+              f"{effect}: invalid custom edit restores the user's document, not the preset", text)
+
+    drv.settings_changed({"rippleEffect": "ring"})
+    drv.diagnostics()
+    drv.settings_changed({"rippleEffect": "custom", "customStyle": "not json"})
+    text = drv.diagnostics()
+    check("style document: 2 layers, loop=600ms" in text,
+          "switching through a built-in retains the last valid custom document", text)
+    drv.settings_changed({"rippleEffect": "custom", "customStyle": ""})
+    drv.diagnostics()
+    drv.settings_changed({"rippleEffect": "orbit"})
+    drv.diagnostics()
+    drv.settings_changed({"rippleEffect": "custom", "customStyle": "not json"})
+    text = drv.diagnostics()
+    check("parse error (ring fallback)" in text and "style document: none" in text,
+          "clearing custom JSON clears its fallback; presets never become a user document", text)
 
     print("== restore built-in style ==")
     drv._send({"jsonrpc": "2.0", "method": "settingsChanged", "params": {"settings": {
@@ -400,6 +453,46 @@ def main():
     check("throw" not in err and "Internal error" not in err,
           "stderr is clean of crashes", err[:400])
 
+
+def main():
+    if not os.path.exists(EXE):
+        print(f"findmouse.exe not found at {EXE}; build first.")
+        return 1
+    scratch = Path(HERE).parent / "build" / "integration"
+    scratch.mkdir(parents=True, exist_ok=True)
+    try:
+        with tempfile.TemporaryDirectory(prefix="run-", dir=scratch) as data_dir:
+            drv = Driver(data_dir)
+            try:
+                run(drv, data_dir)
+            finally:
+                drv.close()
+
+        print("== presets: initialize-time settings reach the worker ==")
+        for effect in ("ping", "heart", "orbit"):
+            with tempfile.TemporaryDirectory(prefix="startup-", dir=scratch) as data_dir:
+                drv = Driver(data_dir)
+                try:
+                    response = drv.initialize({"rippleEffect": effect, "followTimeoutMs": 250,
+                                               "fadeOutMs": 0, "shakeEnabled": False})
+                    check(response is not None and "error" not in response, f"{effect}: initializes cleanly")
+                    # The SDK acknowledges initialize before calling initialized().
+                    # A subsequent request is the protocol barrier for worker startup.
+                    text = drv.diagnostics()
+                    wins = ripple_windows_of_pid(drv.proc.pid)
+                    check(len(wins) == 1, f"{effect}: overlay ready after initialization barrier")
+                    hwnd = wins[0] if wins else 0
+                    check(f"custom style: preset ({effect})" in text, f"{effect}: selected at initialize", text)
+                    drv.action("showNow")
+                    time.sleep(0.1)
+                    check(hwnd and ctypes.windll.user32.IsWindowVisible(hwnd), f"{effect}: initial beacon shows")
+                    time.sleep(0.6)
+                    check(hwnd and not ctypes.windll.user32.IsWindowVisible(hwnd),
+                          f"{effect}: initialize-time timeout and fade settings take effect")
+                finally:
+                    drv.close()
+    finally:
+        scratch.rmdir()  # TemporaryDirectory has already removed all test state
     print(f"\n{passed} passed, {failed} failed")
     return 0 if failed == 0 else 1
 

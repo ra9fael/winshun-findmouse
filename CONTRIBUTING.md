@@ -54,10 +54,12 @@ upstream as a separate commit.
 ## Tests
 
 - `ctest` runs `findmouse_tests`: the shake state machine, settings parsing
-  and clamping, the custom-style JSON parser, fade-out settings.
+  and clamping, the custom-style JSON parser, fade-out settings, preset lookup,
+  sweep continuity and manifest/registry agreement.
 - `python tests/integration.py` starts the built `findmouse.exe` over its
   JSON-RPC stdio and checks protocol shape, side-effect rules, persistence,
-  the overlay window (visible, follows the pointer, fades, hides). It needs an
+  the overlay window (visible, follows the pointer, fades, hides), preset
+  initialization and switching, and custom-document fallback. It needs an
   interactive desktop session, so CI does not run it; run it before a PR that
   touches `main.cpp`, `ripple_overlay.*` or `mouse_hook.*`. The cursor-tracking
   check retries three times because a real mouse can fight the synthetic move.

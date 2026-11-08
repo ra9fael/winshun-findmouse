@@ -18,6 +18,7 @@
 #include <memory>
 #include <thread>
 #include <windows.h>
+#include <future>
 
 namespace fm {
 
@@ -38,8 +39,8 @@ public:
     // (0 = hide at once). A new trigger restarts the animation, also mid-fade.
     void request(int x, int y);
 
-    // Apply new settings. customDoc carries the parsed custom-style JSON and
-    // may be null (Custom then renders the ring fallback). The document is
+    // Apply new settings. customDoc carries the preset or custom-style JSON
+    // and may be null (the generic renderer falls back to Ring). The document is
     // shared; the overlay thread only reads it.
     void updateStyle(const Settings& settings, std::shared_ptr<const StyleDoc> customDoc);
 
@@ -56,7 +57,7 @@ private:
         std::shared_ptr<const StyleDoc> doc;
     };
 
-    void run();
+    void run(std::promise<bool> ready);
     static LRESULT CALLBACK procStatic(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     LRESULT proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     void beginFollow(HWND hwnd, int x, int y);
@@ -73,7 +74,7 @@ private:
     void renderWaves(double s, double p);
     void renderHalo(double s, double p);
     void renderRadar(double s, double p);
-    void renderCustom(double s, double p);
+    void renderCustom(double s, double cycles);
     void stampDot(double s);
 
     std::thread m_thread;

@@ -53,4 +53,4 @@ foreach(config DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
 endforeach()
 
 enable_testing()
-add_test(NAME findmouse_logic COMMAND findmouse_tests)
+add_test(NAME findmouse_logic COMMAND findmouse_tests "${CMAKE_SOURCE_DIR}/plugin.json")
