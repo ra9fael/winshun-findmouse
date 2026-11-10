@@ -1,0 +1,96 @@
+== initialize ==
+  PASS  initialize answers protocolVersion 1
+  PASS  initialize answers the plugin name
+  PASS  exactly one ripple window in our process
+  PASS  ripple window exists after initialize
+  PASS  ripple window is layered (per-pixel alpha)
+  PASS  ripple window is click-through
+  PASS  ripple window is topmost
+== query: read-only, three rows ==
+  PASS  empty query returns 3 rows
+  PASS  row ids are stable
+  PASS  all rows carry title and subtitle
+  PASS  rows use glyph icons (no binary assets needed)
+  PASS  query wrote no state file
+  PASS  query did not show the beacon
+== query: text filters rows ==
+  PASS  query 'diag' filters to the diagnostics row
+  PASS  no-match query returns an empty list honestly
+== action: showNow ==
+  PASS  showNow hides the launcher
+  PASS  beacon window actually becomes visible on showNow
+== follow mode: the beacon tracks the cursor ==
+  PASS  beacon re-centers on the moved cursor
+  PASS  beacon stays visible until a button is pressed
+== action: toggleShake persists ==
+  PASS  toggleShake notifies the user
+  PASS  toggleShake wrote shakeEnabled:false
+  PASS  query reflects the disabled state in the row title
+  PASS  second toggle re-enables and persists
+== action: copyDiagnostics ==
+  PASS  copyDiagnostics returns a copy effect
+  PASS  diagnostics say the hook is installed
+  PASS  diagnostics carry the gesture counters
+  PASS  diagnostics echo the default accent
+  PASS  omitted effect selects the default heartbeat document
+  PASS  copyDiagnostics does not open anything or rewrite the query
+== settingsChanged is applied ==
+  PASS  new shakeReversals visible in diagnostics
+  PASS  new color visible in diagnostics
+  PASS  new window visible in diagnostics
+== custom style: valid JSON drives the renderer ==
+  PASS  effect=custom visible in diagnostics
+  PASS  custom doc parsed (2 layers)
+  PASS  custom style renders a real window
+== custom style: bad JSON falls back, never blanks ==
+  PASS  bad customStyle reported in diagnostics
+  PASS  beacon still visible after a bad customStyle (previous custom retained)
+== presets: live switching and custom fallback isolation ==
+  PASS  ping: selection resolves to the preset
+  PASS  ping: runtime selects the validated preset document
+  PASS  ping: reuses the visible overlay
+  PASS  ping: invalid custom edit restores the user's document, not the preset
+  PASS  heart: selection resolves to the preset
+  PASS  heart: runtime selects the validated preset document
+  PASS  heart: reuses the visible overlay
+  PASS  heart: invalid custom edit restores the user's document, not the preset
+  PASS  orbit: selection resolves to the preset
+  PASS  orbit: runtime selects the validated preset document
+  PASS  orbit: reuses the visible overlay
+  PASS  orbit: invalid custom edit restores the user's document, not the preset
+  PASS  switching through a built-in retains the last valid custom document
+  PASS  clearing custom JSON clears its fallback; presets never become a user document
+== restore built-in style ==
+  PASS  built-in style restored
+== decay: the beacon fades out instead of vanishing ==
+  PASS  fadeOutMs visible in diagnostics
+  PASS  beacon still visible mid-fade (no abrupt hide)
+  PASS  beacon hidden once the fade completes
+== decay: fadeOutMs = 0 hides at once ==
+  PASS  fadeOutMs=0 hides right after the timeout
+== robustness: garbage and unknown methods ==
+  PASS  process survives a garbage line
+  PASS  unknown method answers -32601
+== shutdown ==
+  PASS  shutdown answers cleanly
+  PASS  process exits 0 after shutdown
+  PASS  ripple window destroyed after shutdown
+  PASS  stderr is clean of crashes
+== presets: initialize-time settings reach the worker ==
+  PASS  ping: initializes cleanly
+  PASS  ping: overlay ready after initialization barrier
+  PASS  ping: selected at initialize
+  PASS  ping: initial beacon shows
+  PASS  ping: initialize-time timeout and fade settings take effect
+  PASS  heart: initializes cleanly
+  PASS  heart: overlay ready after initialization barrier
+  PASS  heart: selected at initialize
+  PASS  heart: initial beacon shows
+  PASS  heart: initialize-time timeout and fade settings take effect
+  PASS  orbit: initializes cleanly
+  PASS  orbit: overlay ready after initialization barrier
+  PASS  orbit: selected at initialize
+  PASS  orbit: initial beacon shows
+  PASS  orbit: initialize-time timeout and fade settings take effect
+
+77 passed, 0 failed

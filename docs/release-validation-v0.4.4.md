@@ -31,7 +31,7 @@ manifest 默认值和 `Settings` 默认值同时改为 `heart`；同步下拉框
 
 GitHub release workflow 从标签的干净提交构建，运行 CTest，再生成 `.wsplugin` 和 `.sha256`。
 发布后的下载、校验和、manifest 与真实宿主检查结果记录在工作台
-`WinShun/docs/validation/findmouse-release-v0.4.4/`。本文件随标签记录本地发布前验证。
+`docs/validation/findmouse-release-v0.4.4/`。本文件随标签记录本地发布前验证。
 
 ## 公开发布核对
 

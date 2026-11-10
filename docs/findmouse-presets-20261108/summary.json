@@ -1,0 +1,17 @@
+{
+  "package_matches_current_sources": true,
+  "checksum_verified": true,
+  "documentation_links_valid": true,
+  "unit_assertions": 178,
+  "integration_assertions": 76,
+  "real_host_presets": [
+    "ping",
+    "heart",
+    "orbit"
+  ],
+  "real_host_show_actions": 3,
+  "extracted_package_host_check": "orbit passed",
+  "temporary_workspace_entries": [
+    "build.bat"
+  ]
+}

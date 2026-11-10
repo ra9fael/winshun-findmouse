@@ -1,0 +1,9 @@
+{
+  "files": 31,
+  "errors": [],
+  "warnings": [
+    "ra9fael.findmouse-0.4.4.wsplugin：未审核的原生插件：文件检查与哈希不代表代码审核或构建来源证明"
+  ],
+  "manifest_default": "heart",
+  "extracted_package_host": "passed"
+}

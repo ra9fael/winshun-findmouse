@@ -1,0 +1,8 @@
+MSBuild version 18.11.1-1.26513.3+940033be3 for .NET Framework
+
+  main.cpp
+  ripple_overlay.cpp
+  Generating Code...
+  findmouse.vcxproj -> D:\dev\github\winshun-dev\ra9fael.findmouse\findmouse.exe
+  test_shake_logic.cpp
+  findmouse_tests.vcxproj -> D:\dev\github\winshun-dev\_msvc\findmouse\tests\findmouse_tests.exe

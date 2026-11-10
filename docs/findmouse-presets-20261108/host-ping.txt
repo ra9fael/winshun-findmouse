@@ -1,0 +1,51 @@
+plugin ra9fael.findmouse 0.4.4 (晃动找鼠标): resident, 1 command(s)
+  log: 2026-11-08 15:37:18.500 ra9fael.findmouse: 启动 D:\dev\github\winshun-dev\ra9fael.findmouse\findmouse.exe
+  log: 2026-11-08 15:37:18.515 runner 就绪（pid 13120，令牌来源 3）
+mouse: 3 item(s)
+[
+    {
+        "id": "showNow",
+        "score": 90,
+        "subtitle": "涟漪跟随鼠标，按下左/右键结束 · Enter",
+        "title": "立即显示定位动画"
+    },
+    {
+        "id": "toggleShake",
+        "score": 80,
+        "subtitle": "快速左右晃动鼠标时显示跟随涟漪 · Ctrl+Enter 切换",
+        "title": "晃动检测：已开启"
+    },
+    {
+        "id": "copyDiagnostics",
+        "score": 70,
+        "subtitle": "钩子状态、手势计数与当前参数 · Shift+Enter",
+        "title": "复制诊断信息"
+    }
+]
+
+
+cold start (runner + plugin, to the first answer): 87.4 ms
+first round trip after it:                        0.9 ms
+steady state (2): median 0.66 ms  p95 0.66 ms  min 0.63 ms  max 0.66 ms
+plugin state: 3, pid 38008
+plugin process: integrity medium (8192), elevated no, in a job yes
+action copyDiagnostics on "立即显示定位动画": done in 0.7 ms
+  effect copy WinShun Find Mouse (ra9fael.findmouse) diagnostics
+version: 0.4.4
+hook installed: yes
+hook thread alive: yes
+host process: wsbench.exe, integrity: medium
+shake detection: enabled
+moves seen: 0
+reversals: 0
+ripples triggered: 0
+config: window=400ms, reversals=6, stroke=80px, cooldown=1500ms, minSpeed=1000px/s
+ripple: 700ms, size=64px, accent=#2AA8FF, effect=ping
+follow timeout: 3000ms (0 = until a mouse button), fade out: 400ms (0 = instant)
+custom style: preset (ping)
+style document: 3 layers, loop=1100ms
+locale: zh, theme: light
+dataDir: D:\dev\github\winshun-dev\build\findmouse-tasks\wsbench-CxSIek\data\ra9fael.findmouse.data
+
+  effect notify 已复制诊断信息
+  effect hide 

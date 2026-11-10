@@ -76,7 +76,7 @@ Ping/Heart/Orbit 周期分别为 1100/1400/1600 ms。默认效果为心跳；升
 
 ## 11. 交付报告
 
-开发验收见工作台 `WinShun/docs/validation/findmouse-presets-20261108/README.md`。
+开发验收见工作台 `docs/validation/findmouse-presets-20261108/README.md`。
 默认心跳的发布验收见 [v0.4.4 验证记录](release-validation-v0.4.4.md)。
 
 [English](presets-design.en.md)

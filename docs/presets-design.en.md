@@ -81,7 +81,7 @@ false positives. The design preview is not a capture of the native renderer.
 
 ## 11. Delivery report
 
-Development evidence lives at workspace `WinShun/docs/validation/findmouse-presets-20261108/README.en.md`.
+Development evidence lives at workspace `docs/validation/findmouse-presets-20261108/README.en.md`.
 See [v0.4.4 validation](release-validation-v0.4.4.en.md) for the default-Heartbeat release checks.
 
 [简体中文](presets-design.md)

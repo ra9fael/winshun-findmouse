@@ -1,0 +1,22 @@
+{
+  "version": "0.4.4",
+  "commit": "43dd1be80c08bf9edc305ac7b6baba914d8adc98",
+  "release_url": "https://github.com/ra9fael/winshun-findmouse/releases/tag/v0.4.4",
+  "published_at": "2026-11-08T11:52:39Z",
+  "file": "D:\\dev\\github\\winshun-dev\\ra9fael.findmouse\\dist\\release-v0.4.4-public\\ra9fael.findmouse-0.4.4.wsplugin",
+  "sha256": "6cdae7c324a985e89fd4c99756566817020b30144c741b75f16cda130c0414a9",
+  "bytes": 769608,
+  "files": 31,
+  "github_digest_matches": true,
+  "checksum_asset_matches": true,
+  "default_effect": "heart",
+  "package_errors": [],
+  "package_warnings": [
+    "ra9fael.findmouse-0.4.4.wsplugin：未审核的原生插件：文件检查与哈希不代表代码审核或构建来源证明"
+  ],
+  "real_host": "passed",
+  "integration_passed": 77,
+  "integration_failed": 0,
+  "ci_run": 42477493842,
+  "release_run": 42477583397
+}

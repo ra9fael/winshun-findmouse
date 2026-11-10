@@ -1,0 +1,35 @@
+{
+  "source": "real findmouse.exe layered window on an isolated solid backdrop",
+  "exe_sha256": "b4d990c36dc3c38acbbb2eab066b12cbc7356030ae36323c4445c7cb5b7de7d1",
+  "frames": [
+    {
+      "effect": "ring",
+      "file": "ring-v0.4.4.png",
+      "delay_seconds": 0.2,
+      "sha256": "f512812ea981995aae22232708d9c8789669af2a4c684311209a454af8baa530",
+      "diagnostics": "WinShun Find Mouse (ra9fael.findmouse) diagnostics\nversion: 0.4.4\nhook installed: yes\nhook thread alive: yes\nhost process: pwsh.exe, integrity: medium\nshake detection: disabled\nmoves seen: 0\nreversals: 0\nripples triggered: 0\nconfig: window=400ms, reversals=6, stroke=80px, cooldown=1500ms, minSpeed=1000px/s\nripple: 700ms, size=64px, accent=#2AA8FF, effect=ring\nfollow timeout: 0ms (0 = until a mouse button), fade out: 400ms (0 = instant)\ncustom style: none\nstyle document: none\nlocale: en, theme: light\ndataDir: D:\\dev\\github\\winshun-dev\\build\\findmouse-tasks\\capture-l35xnm33\n"
+    },
+    {
+      "effect": "heart",
+      "file": "heart-v0.4.4.png",
+      "delay_seconds": 0.25,
+      "sha256": "bbb4ef708be99e74817d4bd52f3aa5fba470adb27e5160635f781928da601c1b",
+      "diagnostics": "WinShun Find Mouse (ra9fael.findmouse) diagnostics\nversion: 0.4.4\nhook installed: yes\nhook thread alive: yes\nhost process: pwsh.exe, integrity: medium\nshake detection: disabled\nmoves seen: 0\nreversals: 0\nripples triggered: 1\nconfig: window=400ms, reversals=6, stroke=80px, cooldown=1500ms, minSpeed=1000px/s\nripple: 700ms, size=64px, accent=#2AA8FF, effect=heart\nfollow timeout: 0ms (0 = until a mouse button), fade out: 400ms (0 = instant)\ncustom style: preset (heart)\nstyle document: 3 layers, loop=1400ms\nlocale: en, theme: light\ndataDir: D:\\dev\\github\\winshun-dev\\build\\findmouse-tasks\\capture-l35xnm33\n"
+    },
+    {
+      "effect": "ping",
+      "file": "ping-v0.4.4.png",
+      "delay_seconds": 0.2,
+      "sha256": "2b6cd67e6c77ea470091fb64d4472f8ef64d4a296db6b2287aeb4ad203fe2181",
+      "diagnostics": "WinShun Find Mouse (ra9fael.findmouse) diagnostics\nversion: 0.4.4\nhook installed: yes\nhook thread alive: yes\nhost process: pwsh.exe, integrity: medium\nshake detection: disabled\nmoves seen: 0\nreversals: 0\nripples triggered: 2\nconfig: window=400ms, reversals=6, stroke=80px, cooldown=1500ms, minSpeed=1000px/s\nripple: 700ms, size=64px, accent=#2AA8FF, effect=ping\nfollow timeout: 0ms (0 = until a mouse button), fade out: 400ms (0 = instant)\ncustom style: preset (ping)\nstyle document: 3 layers, loop=1100ms\nlocale: en, theme: light\ndataDir: D:\\dev\\github\\winshun-dev\\build\\findmouse-tasks\\capture-l35xnm33\n"
+    },
+    {
+      "effect": "orbit",
+      "file": "orbit-v0.4.4.png",
+      "delay_seconds": 0.4,
+      "sha256": "63ab30e4b457e73d9e3f8a93ef3fa754d1eca52a1282b9e0eb339a3ea81e8e81",
+      "diagnostics": "WinShun Find Mouse (ra9fael.findmouse) diagnostics\nversion: 0.4.4\nhook installed: yes\nhook thread alive: yes\nhost process: pwsh.exe, integrity: medium\nshake detection: disabled\nmoves seen: 0\nreversals: 0\nripples triggered: 3\nconfig: window=400ms, reversals=6, stroke=80px, cooldown=1500ms, minSpeed=1000px/s\nripple: 700ms, size=64px, accent=#2AA8FF, effect=orbit\nfollow timeout: 0ms (0 = until a mouse button), fade out: 400ms (0 = instant)\ncustom style: preset (orbit)\nstyle document: 3 layers, loop=1600ms\nlocale: en, theme: light\ndataDir: D:\\dev\\github\\winshun-dev\\build\\findmouse-tasks\\capture-l35xnm33\n"
+    }
+  ],
+  "cursor_moved": false
+}

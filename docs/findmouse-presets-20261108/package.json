@@ -1,0 +1,13 @@
+{
+  "file": "D:\\dev\\github\\winshun-dev\\ra9fael.findmouse\\dist\\presets-20261108\\ra9fael.findmouse-0.4.4.wsplugin",
+  "sha256": "fe036f7227e4739960ad7ed8d1c596923dcee4c52dfc9dd831e8ce905b4ad6b9",
+  "bytes": 723894,
+  "files": 22,
+  "errors": [],
+  "warnings": [
+    "ra9fael.findmouse-0.4.4.wsplugin：未审核的原生插件：文件检查与哈希不代表代码审核或构建来源证明"
+  ],
+  "required_files_present": true,
+  "built_executable_matches": true,
+  "public_release": false
+}

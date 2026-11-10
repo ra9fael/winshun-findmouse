@@ -32,7 +32,7 @@ This is an author-repository release, installed from its GitHub Release archive;
 
 The release workflow builds the clean tagged commit, runs CTest and generates a `.wsplugin` plus `.sha256`.
 Post-publication download, checksum, manifest and real-host results are recorded in workspace
-`WinShun/docs/validation/findmouse-release-v0.4.4/`. This tagged document records local pre-release checks.
+`docs/validation/findmouse-release-v0.4.4/`. This tagged document records local pre-release checks.
 
 ## Public release verification
 
